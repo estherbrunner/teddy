@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "generated_by": "checks/manifest-sync.ts",
+  "adrs": {
+    "0001-teddy-bootstrap": {
+      "status": "proposed",
+      "approved_by": null,
+      "assertions": [
+        "checks/manifest-sync.ts",
+        "checks/scores-check.ts",
+        "checks/selftest.ts"
+      ],
+      "criteria": ["adr-traceability"]
+    },
+    "0002-cockpit-minimal-scope": {
+      "status": "proposed",
+      "approved_by": null,
+      "assertions": ["checks/cockpit-report.ts"],
+      "criteria": ["cockpit-clarity"]
+    }
+  }
+}
