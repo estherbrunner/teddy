@@ -75,7 +75,8 @@ skills/                     agent skills: adr-author, rubric-judge, manifest-syn
 
 ## Status
 
-ADRs 0001 and 0002 accepted by estherbrunner (2026-09-11). Iteration 0003
-(`loop-closure`) is the first exercise of the disagreement-resolution loop:
-the baseline-gate comparability defect flagged during bootstrap review is being
-resolved into an adr/0001 amendment promoted to a deterministic assertion.
+ADRs 0001–0002 accepted; iterations 0001–0003 closed (PR #1 merged 2026-09-11).
+Iteration 0004 (`github-native-approval`) is open: implementing adr/0003 —
+approval moves from forgeable file fields to GitHub-native gates (merge =
+approval; derived status written only by a post-merge scribe workflow; gates
+configured per team via CODEOWNERS + rulesets).

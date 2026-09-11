@@ -21,6 +21,13 @@
       "scores": "iterations/0003-loop-closure/scores.json",
       "baseline": "0002-cockpit-minimal-scope",
       "status": "closed"
+    },
+    {
+      "id": "0004-github-native-approval",
+      "ticket": "iterations/0004-github-native-approval/ticket.md",
+      "scores": "iterations/0004-github-native-approval/scores.json",
+      "baseline": "0003-loop-closure",
+      "status": "open"
     }
   ]
 }

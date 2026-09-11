@@ -1,0 +1,26 @@
+{
+  "iteration": "0004-github-native-approval",
+  "ticket": "0004",
+  "baseline": "0003-loop-closure",
+  "timestamp": "2026-09-11T20:48:39Z",
+  "criteria": {
+    "adr-traceability": {
+      "score": null,
+      "judge": "manifest-sync",
+      "rationale": "not yet exercised"
+    },
+    "cockpit-clarity": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not yet exercised"
+    },
+    "loop-closure": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not yet exercised"
+    }
+  },
+  "overall": 0,
+  "deterministic_gate": "pass",
+  "approved_by": null
+}

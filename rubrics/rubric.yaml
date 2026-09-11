@@ -17,3 +17,5 @@ adrs:
     criteria: [adr-traceability]
   0002-cockpit-minimal-scope:
     criteria: [cockpit-clarity]
+  0003-github-native-approval:
+    criteria: [adr-traceability]

@@ -23,6 +23,17 @@
       "criteria": [
         "cockpit-clarity"
       ]
+    },
+    "0003-github-native-approval": {
+      "status": "proposed",
+      "approved_by": null,
+      "assertions": [
+        "checks/manifest-sync.ts",
+        "checks/scores-check.ts"
+      ],
+      "criteria": [
+        "adr-traceability"
+      ]
     }
   }
 }
