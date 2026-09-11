@@ -201,7 +201,7 @@ function addIteration0002(root: string, scores: string): void {
     baseline: "0001-fixture",
     status: "open",
   });
-  write(root, "manifest-of-iterations.json", JSON.stringify(entries, null, 2) + "\n");
+  write(root, "manifest-of-iterations.json", `${JSON.stringify(entries, null, 2)}\n`);
 }
 
 // Land the accepted ADR (and mirrored manifest status) via a true merge
@@ -212,7 +212,7 @@ function acceptViaMerge(root: string, withManifest = true): void {
   if (withManifest) {
     const m = JSON.parse(readText(root, "manifest.json"));
     m.adrs["0001-fixture"].status = "accepted";
-    write(root, "manifest.json", JSON.stringify(m, null, 2) + "\n");
+    write(root, "manifest.json", `${JSON.stringify(m, null, 2)}\n`);
   }
   gitc(root, "add", "-A");
   gitc(root, "commit", "-qm", "accept 0001");
@@ -224,7 +224,7 @@ function setRegistryStatus(root: string, id: string, status: string): void {
   const entries = JSON.parse(readText(root, "manifest-of-iterations.json"));
   const it = entries.iterations.find((e: { id: string }) => e.id === id);
   it.status = status;
-  write(root, "manifest-of-iterations.json", JSON.stringify(entries, null, 2) + "\n");
+  write(root, "manifest-of-iterations.json", `${JSON.stringify(entries, null, 2)}\n`);
 }
 
 // adr/0004 fixtures: a package.json declaring linters and fake local .bin
@@ -276,7 +276,7 @@ try {
     write(root, "adr/0001-fixture.md", ADR_ACCEPTED);
     const m = JSON.parse(readText(root, "manifest.json"));
     m.adrs["0001-fixture"].status = "accepted";
-    write(root, "manifest.json", JSON.stringify(m, null, 2) + "\n");
+    write(root, "manifest.json", `${JSON.stringify(m, null, 2)}\n`);
     gitc(root, "add", "-A");
     gitc(root, "commit", "-qm", "accepted directly");
     const ms = run(root, "manifest-sync.ts");
@@ -306,7 +306,7 @@ try {
     roots.push(root);
     const manifest = JSON.parse(readText(root, "manifest.json"));
     manifest.adrs["0001-fixture"].criteria = ["adr-traceability", "cockpit-clarity"];
-    write(root, "manifest.json", JSON.stringify(manifest, null, 2) + "\n");
+    write(root, "manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
     const ms = run(root, "manifest-sync.ts");
     expect(
       "manifest/rubric criteria drift is rejected",
@@ -452,8 +452,8 @@ try {
       ),
     );
     const m = JSON.parse(readText(root, "manifest.json"));
-    (m.adrs["0001-fixture"] as Record<string, unknown>)["approved_by"] = "someone";
-    write(root, "manifest.json", JSON.stringify(m, null, 2) + "\n");
+    (m.adrs["0001-fixture"] as Record<string, unknown>).approved_by = "someone";
+    write(root, "manifest.json", `${JSON.stringify(m, null, 2)}\n`);
     write(
       root,
       "iterations/0001-fixture/scores.json",

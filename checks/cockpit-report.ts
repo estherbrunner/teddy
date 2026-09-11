@@ -72,7 +72,7 @@ const data = {
   iterations: iterationsOut,
 };
 
-const content = "window.__TEDDY_DATA__ = " + JSON.stringify(data, null, 2) + ";\n";
+const content = `window.__TEDDY_DATA__ = ${JSON.stringify(data, null, 2)};\n`;
 const dataRel = "cockpit/data.js";
 
 if (checkOnly) {

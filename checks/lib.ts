@@ -35,7 +35,7 @@ export function repositoryUrl(root: string): string | null {
   if (res.status !== 0) return null;
   let url = res.stdout.trim();
   if (url.startsWith("git@github.com:")) {
-    url = "https://github.com/" + url.slice("git@github.com:".length);
+    url = `https://github.com/${url.slice("git@github.com:".length)}`;
   }
   if (url.endsWith(".git")) url = url.slice(0, -".git".length);
   return url.startsWith("https://") ? url : null;
