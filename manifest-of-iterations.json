@@ -41,7 +41,7 @@
       "ticket": "iterations/0006-judge-surface-promotion/ticket.md",
       "scores": "iterations/0006-judge-surface-promotion/scores.json",
       "baseline": "0005-lint-gate",
-      "status": "open"
+      "status": "closed"
     }
   ]
 }

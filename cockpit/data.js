@@ -13,7 +13,7 @@ window.__TEDDY_DATA__ = {
       },
       {
         "id": "cockpit-clarity",
-        "description": "Dashboard surfaces trend, ADR status, and judge/deterministic ratio without extra clicks",
+        "description": "Dashboard is clear and legible — visual quality beyond the structural surface pinned by cockpit-surface",
         "weight": 1,
         "judge": "llm"
       },
@@ -22,6 +22,12 @@ window.__TEDDY_DATA__ = {
         "description": "Disagreements between judge and human resolve into an ADR amendment or promoted assertion within one iteration",
         "weight": 3,
         "judge": "llm"
+      },
+      {
+        "id": "cockpit-surface",
+        "description": "Dashboard structurally surfaces trend, ADR status, and judge/deterministic ratio on a single page from precomputed data",
+        "weight": 2,
+        "judge": "cockpit-surface"
       }
     ]
   },
@@ -67,6 +73,16 @@ window.__TEDDY_DATA__ = {
         "checks/lint.ts"
       ],
       "criteria": []
+    },
+    {
+      "id": "0005-judge-surface-promotion",
+      "status": "proposed",
+      "assertions": [
+        "checks/cockpit-surface.ts"
+      ],
+      "criteria": [
+        "cockpit-surface"
+      ]
     }
   ],
   "iterations": [
@@ -212,6 +228,40 @@ window.__TEDDY_DATA__ = {
           "score": null,
           "judge": "llm",
           "rationale": "not exercised — no judge/human disagreement surfaced"
+        }
+      }
+    },
+    {
+      "id": "0006-judge-surface-promotion",
+      "baseline": "0005-lint-gate",
+      "status": "closed",
+      "timestamp": "2026-09-11T23:26:41Z",
+      "overall": 1,
+      "deterministic_gate": "pass",
+      "judge_surface": {
+        "deterministic": 2,
+        "total": 2
+      },
+      "criteria": {
+        "adr-traceability": {
+          "score": 1,
+          "judge": "manifest-sync",
+          "rationale": "checks/manifest-sync.ts passes: 5 ADRs resolve, adr/0005 linked to its assertion checks/cockpit-surface.ts and the new cockpit-surface criterion with manifest↔rubric.yaml parity, no orphans (7 linked assertions); both directions verified by the 31-case selftest"
+        },
+        "cockpit-clarity": {
+          "score": null,
+          "judge": "llm",
+          "rationale": "not exercised — the dashboard's visual output is unchanged; this iteration only pins its structure (adr/0005 narrows this criterion to the subjective residue)"
+        },
+        "loop-closure": {
+          "score": null,
+          "judge": "llm",
+          "rationale": "not exercised — a directed promotion initiative, not a judge/human disagreement; adr/0005 records why loop-closure itself resists deterministic promotion (no offline signal for 'a disagreement occurred')"
+        },
+        "cockpit-surface": {
+          "score": 1,
+          "judge": "cockpit-surface",
+          "rationale": "checks/cockpit-surface.ts passes on the real cockpit: data.js carries overall in [0,1], adrs[].status in the lifecycle, and judge_surface for all 5 iterations; index.html has exactly one #app root plus the two committed scripts; main.ts pins the single data source, trend chart, status and ratio rendering, and no navigation — fail paths verified by 5 selftest cases"
         }
       }
     }
