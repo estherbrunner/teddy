@@ -34,7 +34,7 @@
       "ticket": "iterations/0005-lint-gate/ticket.md",
       "scores": "iterations/0005-lint-gate/scores.json",
       "baseline": "0004-github-native-approval",
-      "status": "open"
+      "status": "closed"
     }
   ]
 }

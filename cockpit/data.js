@@ -59,6 +59,14 @@ window.__TEDDY_DATA__ = {
       "criteria": [
         "adr-traceability"
       ]
+    },
+    {
+      "id": "0004-lint-gate",
+      "status": "proposed",
+      "assertions": [
+        "checks/lint.ts"
+      ],
+      "criteria": []
     }
   ],
   "iterations": [
@@ -175,6 +183,35 @@ window.__TEDDY_DATA__ = {
           "score": null,
           "judge": "llm",
           "rationale": "not exercised — adr/0003 was a directed design decision, not a judge/human disagreement"
+        }
+      }
+    },
+    {
+      "id": "0005-lint-gate",
+      "baseline": "0004-github-native-approval",
+      "status": "closed",
+      "timestamp": "2026-09-11T23:05:12Z",
+      "overall": 1,
+      "deterministic_gate": "pass",
+      "judge_surface": {
+        "deterministic": 1,
+        "total": 1
+      },
+      "criteria": {
+        "adr-traceability": {
+          "score": 1,
+          "judge": "manifest-sync",
+          "rationale": "checks/manifest-sync.ts passes: 4 ADRs resolve, adr/0004 linked to its assertion checks/lint.ts with manifest↔rubric.yaml parity and no orphans (6 linked assertions); both directions verified by the 26-case selftest — the 6 new lint-gate cases exercise detection, skip, fail-closed, and priority-order paths against git-backed fixtures"
+        },
+        "cockpit-clarity": {
+          "score": null,
+          "judge": "llm",
+          "rationale": "not exercised — the dashboard is untouched by this iteration"
+        },
+        "loop-closure": {
+          "score": null,
+          "judge": "llm",
+          "rationale": "not exercised — no judge/human disagreement surfaced"
         }
       }
     }
