@@ -1,9 +1,9 @@
 ---
 id: 0002
-status: proposed
+status: accepted
 supersedes: null
 superseded_by: null
-approved_by: null
+approved_by: estherbrunner
 rubric_refs: [cockpit-clarity]
 ---
 
