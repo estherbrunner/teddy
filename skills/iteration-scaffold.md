@@ -18,7 +18,7 @@ attributable; multiple concerns in one iteration are forbidden.
 id: NNNN
 type: feature | bugfix | skill | decision | refactor
 goal: <one sentence>
-constraint: score must not decrease (baseline: iterations/MMMM-slug/scores.json)
+constraint: each exercised criterion must not decrease against its last recorded score (baseline: iterations/MMMM-slug/scores.json)
 adr_refs: [...]
 pr: null
 ---

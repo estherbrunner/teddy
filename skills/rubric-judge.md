@@ -20,9 +20,10 @@ that follows is the corrective when you and the human disagree.
 4. Recompute `overall = Σ(weightᵢ × scoreᵢ) / Σ(weightᵢ)` over non-null criteria
    (weights from `rubrics/rubric.yaml`) and store it in `scores.json`.
    `scores-check` recomputes it and rejects arithmetic errors.
-5. Run `node checks/scores-check.ts`. If the baseline gate fails
-   (`overall < baseline`), the iteration is **not done**: improve the work or
-   descope. Never lower the baseline or null out criteria to pass.
+5. Run `node checks/scores-check.ts`. If the baseline gate fails (a criterion
+   scored below its last recorded value — adr/0001, amended), the iteration is
+   **not done**: improve the work or descope. Never lower a score's prior, and
+   never null out previously scored criteria to pass.
 
 ## Judge–human disagreement
 
