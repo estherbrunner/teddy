@@ -12,8 +12,8 @@ self-hosted: its first project is itself, including its own cockpit dashboard.
    (`proposed → accepted → deprecated | superseded`). Since adr/0003 the approval **is the
    merge**: status transitions land inside PRs and GitHub records who merged; nothing under
    `adr/` is ever auto-merged.
-2. **Deterministic assertions** (`checks/`) — reproducible checks tied to specific ADRs.
-   Binary pass/fail. Hard gate: they must pass regardless of any score.
+2. **Deterministic assertions** (`checks/`) — reproducible checks tied to specific ADRs,
+   plus the lint gate. Binary pass/fail. Hard gate: they must pass regardless of any score.
 3. **Rubric criteria** (`rubrics/rubric.yaml`) — weighted, human-defined criteria scored by
    LLM-as-judge where deterministic checks aren't (yet) possible. Judge/human disagreements
    resolve into ADR amendments or promoted assertions, shrinking the judge's surface over time.
@@ -49,7 +49,8 @@ Requires Node ≥ 23.6 (checks run on Node's native type-stripping; no build ste
 
 ```sh
 npm install
-npm test          # selftest + all deterministic gates + typecheck
+npm test          # lint + selftest + all deterministic gates + typecheck
+npm run lint      # the lint gate alone (detects the declared linter, adr/0004)
 npm run report    # regenerate cockpit/data.js from manifests + scores
 npm run build     # tsc → cockpit/main.js
 open cockpit/index.html
@@ -60,11 +61,12 @@ open cockpit/index.html
 ```
 adr/                        decision records (merge = approval, adr/0003)
 rubrics/rubric.yaml         weighted criteria + per-ADR criterion links
-checks/                     deterministic assertions (zero runtime deps)
+checks/                     deterministic assertions
   manifest-sync.ts          traceability gate + merge-as-approval lifecycle gate
   scores-check.ts           scores schema + per-criterion baseline gate
   cockpit-report.ts         regenerates/verifies cockpit/data.js
-  scribe.ts                 the one writer of derived state — runs in CI on merge
+  scribe.ts                 the one writer of derived state — runs in CI on the iteration PR
+  lint.ts                   lint gate: runs the linter declared in package.json (adr/0004)
   selftest.ts               verifies the checks themselves (fail + pass paths)
   lib.ts                    shared parsing/aggregation
 manifest.json               SSOT: adr → assertions → criteria
@@ -99,8 +101,8 @@ accounts; agents must never merge.
 
 ## Status
 
-ADRs 0001–0002 accepted; iterations 0001–0003 closed (PR #1 merged 2026-09-11).
-Iteration 0004 (`github-native-approval`) is open: implementing adr/0003 —
-approval moves from forgeable file fields to GitHub-native gates (merge =
-approval; derived status written only by a post-merge scribe workflow; gates
-configured per team via CODEOWNERS + rulesets).
+ADRs 0001–0003 accepted; iterations 0001–0004 closed (latest: PR #3, the
+pre-merge scribe amendment). Iteration 0005 (`lint-gate`) implements adr/0004
+— a linter-agnostic deterministic `npm run lint` gate: the linter declared in
+`package.json` (Biome, ESLint, oxlint, standard, xo) runs from its
+lockfile-pinned local install; Teddy itself adopts Biome.
