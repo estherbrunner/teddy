@@ -5,22 +5,22 @@
   "timestamp": "2026-09-11T19:52:33Z",
   "criteria": {
     "adr-traceability": {
-      "score": null,
+      "score": 1,
       "judge": "manifest-sync",
-      "rationale": "not yet exercised"
+      "rationale": "checks/manifest-sync.ts passes: both accepted ADRs resolve to linked assertions/criteria, the amendment adds no unlinked artifacts, scores-check remains the promoted assertion for adr/0001"
     },
     "cockpit-clarity": {
       "score": null,
       "judge": "llm",
-      "rationale": "not yet exercised"
+      "rationale": "not exercised — no cockpit change this iteration"
     },
     "loop-closure": {
-      "score": null,
+      "score": 1,
       "judge": "llm",
-      "rationale": "not yet exercised"
+      "rationale": "the gate-comparability defect flagged during bootstrap review (and concurred by the human) resolved within one iteration into both halves of the fork: adr/0001 amendment section 'paired per-criterion baseline gate' AND promotion into checks/scores-check.ts (chain-walk) with selftest cases F1/F2 proving the old gate's escape now passes and compensated regressions still fail. Structural evidence, checkable in the diff. If human review downgrades this score, that disagreement itself becomes the next loop-closure datum"
     }
   },
-  "overall": 0,
+  "overall": 1,
   "deterministic_gate": "pass",
   "approved_by": null
 }

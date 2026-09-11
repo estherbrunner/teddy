@@ -27,8 +27,8 @@ window.__TEDDY_DATA__ = {
   "adrs": [
     {
       "id": "0001-teddy-bootstrap",
-      "status": "proposed",
-      "approved_by": null,
+      "status": "accepted",
+      "approved_by": "estherbrunner",
       "assertions": [
         "checks/manifest-sync.ts",
         "checks/scores-check.ts",
@@ -40,8 +40,8 @@ window.__TEDDY_DATA__ = {
     },
     {
       "id": "0002-cockpit-minimal-scope",
-      "status": "proposed",
-      "approved_by": null,
+      "status": "accepted",
+      "approved_by": "estherbrunner",
       "assertions": [
         "checks/cockpit-report.ts"
       ],
@@ -108,6 +108,36 @@ window.__TEDDY_DATA__ = {
           "score": null,
           "judge": "llm",
           "rationale": "not exercised — no judge/human disagreement cycle has occurred yet"
+        }
+      }
+    },
+    {
+      "id": "0003-loop-closure",
+      "baseline": "0002-cockpit-minimal-scope",
+      "status": "open",
+      "timestamp": "2026-09-11T19:52:33Z",
+      "overall": 1,
+      "deterministic_gate": "pass",
+      "approved_by": null,
+      "judge_surface": {
+        "deterministic": 1,
+        "total": 2
+      },
+      "criteria": {
+        "adr-traceability": {
+          "score": 1,
+          "judge": "manifest-sync",
+          "rationale": "checks/manifest-sync.ts passes: both accepted ADRs resolve to linked assertions/criteria, the amendment adds no unlinked artifacts, scores-check remains the promoted assertion for adr/0001"
+        },
+        "cockpit-clarity": {
+          "score": null,
+          "judge": "llm",
+          "rationale": "not exercised — no cockpit change this iteration"
+        },
+        "loop-closure": {
+          "score": 1,
+          "judge": "llm",
+          "rationale": "the gate-comparability defect flagged during bootstrap review (and concurred by the human) resolved within one iteration into both halves of the fork: adr/0001 amendment section 'paired per-criterion baseline gate' AND promotion into checks/scores-check.ts (chain-walk) with selftest cases F1/F2 proving the old gate's escape now passes and compensated regressions still fail. Structural evidence, checkable in the diff. If human review downgrades this score, that disagreement itself becomes the next loop-closure datum"
         }
       }
     }
