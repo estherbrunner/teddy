@@ -123,7 +123,8 @@ ticket — score deltas stay attributable; no squash-merging multiple concerns.
    part of the weighted average).
 4. `rubric-judge` scores affected criteria → weighted aggregate computed via
    `rubric.yaml` weights.
-5. Gate: `new_overall ≥ baseline_overall`. Fails closed.
+5. Gate: per-criterion non-regression (amended — see Amendment below; the
+   bootstrap rule `new_overall ≥ baseline_overall` was unsound). Fails closed.
 6. PR opened with `scores.json` diff attached.
 7. Human merges → `approved_by` set → cockpit ingests → new baseline.
 8. Repeated judge/human disagreement on a criterion → ADR amendment or
@@ -156,3 +157,36 @@ ticket — score deltas stay attributable; no squash-merging multiple concerns.
   mechanically checkable today; pretending otherwise produces brittle proxies.
 - **Cockpit fetching JSON at runtime** — `fetch` of local files fails under
   `file://`; a precomputed `data.js` script keeps the "no server" guarantee.
+
+## Amendment — paired per-criterion baseline gate (iteration 0003)
+
+The bootstrap gate `new_overall ≥ baseline_overall` is replaced by a paired
+per-criterion non-regression gate. This amendment originated in the loop the
+harness exists to close: the judge flagged the defect during bootstrap review,
+the human concurred by opening iteration 0003, and the resolution is both an
+ADR amendment and a promotion of the rule into a deterministic assertion.
+
+- **Defect.** `overall` excludes null criteria, so iterations exercising
+  different criteria sets produce non-comparable aggregates (an honest 0.93
+  across three criteria "loses" to 1.0 over one). Worse, a single large gain
+  elsewhere can mask a regression — the aggregate is exactly where regressions
+  hide.
+- **New rule.** Every non-null criterion in a new iteration must be ≥ the last
+  recorded non-null score for that same criterion, walking the baseline chain
+  backward. A criterion exercised for the first time has no prior and passes.
+  `overall` remains the weighted aggregate over non-null criteria — reported
+  for trend, no longer gated.
+- **Enforcement.** `checks/scores-check.ts` implements the chain walk;
+  `checks/selftest.ts` proves the old gate's escape (an expanded criteria set
+  with an honest 0 on the new criterion) now passes, and that compensated
+  regressions — this criterion down while another improves — still fail.
+
+### Rejected alternatives (amendment)
+
+- **Require every criterion exercised every iteration** — honest "not
+  exercised" nulls are legitimate (cockpit-clarity before a cockpit exists);
+  forcing numbers fabricates data.
+- **Intersect-based overall comparison** — still an aggregate, still maskable,
+  and harder to state than "this criterion may not go down".
+- **Carry baseline scores forward for null criteria** — fabricates evidence
+  and defeats per-iteration scoring.

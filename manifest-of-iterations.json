@@ -6,14 +6,21 @@
       "ticket": "iterations/0001-teddy-bootstrap/ticket.md",
       "scores": "iterations/0001-teddy-bootstrap/scores.json",
       "baseline": null,
-      "status": "open"
+      "status": "closed"
     },
     {
       "id": "0002-cockpit-minimal-scope",
       "ticket": "iterations/0002-cockpit-minimal-scope/ticket.md",
       "scores": "iterations/0002-cockpit-minimal-scope/scores.json",
       "baseline": "0001-teddy-bootstrap",
-      "status": "open"
+      "status": "closed"
+    },
+    {
+      "id": "0003-loop-closure",
+      "ticket": "iterations/0003-loop-closure/ticket.md",
+      "scores": "iterations/0003-loop-closure/scores.json",
+      "baseline": "0002-cockpit-minimal-scope",
+      "status": "closed"
     }
   ]
 }

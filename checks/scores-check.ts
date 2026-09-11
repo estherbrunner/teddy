@@ -1,6 +1,6 @@
 // Deterministic gate over iterations/*/scores.json + tickets + the iteration
 // registry: schema integrity, weighted-aggregation correctness, and the
-// baseline gate (score must not decrease — fails closed).
+// per-criterion baseline gate (score must not decrease — fails closed).
 // Usage: node checks/scores-check.ts [root]
 // Exit 0 = consistent, 1 = failures listed below.
 import { basename, dirname, join } from "node:path";
@@ -173,23 +173,47 @@ for (const entry of registry.iterations) {
   }
 }
 
-// Baseline gate: fails closed.
+// Baseline gate (adr/0001, amended by iteration 0003): paired per-criterion
+// non-regression. Every non-null criterion must be ≥ its last recorded
+// non-null score anywhere in the baseline chain; criteria exercised for the
+// first time have no prior and pass. `overall` is the reported weighted
+// aggregate — not gated — because iterations exercising different criteria
+// sets are not comparable through it. Fails closed.
+function latestPrior(
+  criterionId: string,
+  entry: IterationEntry,
+): { score: number; from: string } | null {
+  let cursor = entry.baseline;
+  const visited = new Set<string>();
+  while (cursor && !visited.has(cursor)) {
+    visited.add(cursor);
+    const prev = byId.get(cursor);
+    if (!prev) return null;
+    const prevScores = scoresById.get(prev.id);
+    const s = prevScores?.criteria[criterionId]?.score;
+    if (typeof s === "number") return { score: s, from: prev.id };
+    cursor = prev.baseline;
+  }
+  return null;
+}
+
 for (const entry of registry.iterations) {
   const scores = scoresById.get(entry.id);
   if (!scores || entry.baseline === null) continue;
+  if (!byId.has(entry.baseline)) continue; // already failed above
   const baseScores = scoresById.get(entry.baseline);
-  if (!baseScores) {
-    fail(`${entry.scores}: baseline '${entry.baseline}' has no readable scores.json`);
-    continue;
-  }
-  if (scores.approved_by !== null && baseScores.approved_by === null) {
+  if (scores.approved_by !== null && baseScores && baseScores.approved_by === null) {
     fail(`${entry.scores}: cannot be closed while baseline '${entry.baseline}' is unapproved`);
   }
-  if (scores.overall < baseScores.overall) {
-    fail(
-      `${entry.scores}: overall ${scores.overall} < baseline ${baseScores.overall} ` +
-        `(${entry.baseline}) — score must not decrease`,
-    );
+  for (const [id, c] of Object.entries(scores.criteria)) {
+    if (c.score === null) continue;
+    const prior = latestPrior(id, entry);
+    if (prior && c.score < prior.score) {
+      fail(
+        `${entry.scores}: per-criterion regression: '${id}' scored ${c.score} < last recorded ` +
+          `${prior.score} (${prior.from}) — score must not decrease (adr/0001, amended)`,
+      );
+    }
   }
 }
 

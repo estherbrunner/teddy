@@ -24,8 +24,9 @@ Orphaned ADRs *and* orphaned assertions are failures.
 
 ```
 ticket → branch → implement → deterministic gates (hard) → rubric-judge scores
-      → overall must not decrease vs baseline (fails closed) → PR with scores diff
-      → human merges (sets approved_by) → new baseline → cockpit updates
+      → per-criterion non-regression vs last recorded score (fails closed)
+      → PR with scores diff → human merges (sets approved_by) → new baseline
+      → cockpit updates
 ```
 
 Per iteration (`iterations/NNNN-slug/`): a `ticket.md` and a `scores.json` snapshot.
@@ -35,6 +36,11 @@ average. `overall` is precomputed — the cockpit stays a static reader.
 ```
 overall = Σ(weightᵢ × scoreᵢ) / Σ(weightᵢ)   over non-null criteria
 ```
+
+The baseline gate is **per-criterion**: a criterion's score may never decrease
+against its last recorded value (adr/0001, amended by iteration 0003). `overall`
+is the reported trend, not the gate — aggregates let one big gain mask a
+regression.
 
 ## Quickstart
 
@@ -69,7 +75,7 @@ skills/                     agent skills: adr-author, rubric-judge, manifest-syn
 
 ## Status
 
-Bootstrapped 2026-09-11. ADRs 0001 (this layout/schema) and 0002 (cockpit minimal scope)
-and the iteration 0001/0002 score snapshots are `proposed` with `approved_by: null` —
-awaiting their first human approvals, by design. The next iteration should be the first
-to exercise the loop end-to-end (and the `loop-closure` criterion).
+ADRs 0001 and 0002 accepted by estherbrunner (2026-09-11). Iteration 0003
+(`loop-closure`) is the first exercise of the disagreement-resolution loop:
+the baseline-gate comparability defect flagged during bootstrap review is being
+resolved into an adr/0001 amendment promoted to a deterministic assertion.

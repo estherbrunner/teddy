@@ -122,7 +122,9 @@ function makeTree(): string {
   return root;
 }
 
-// Second iteration added on top of the valid base: overall 2/3 < baseline 1.
+// Second iteration variants layered on the valid base. Under the amended
+// adr/0001 gate (paired per-criterion non-regression) F1 must fail and F2
+// must pass; under the old `overall ≥ baseline` gate both failed.
 const SCORES_0002 = `{
   "iteration": "0002-fixture",
   "ticket": "0002",
@@ -132,7 +134,22 @@ const SCORES_0002 = `{
     "adr-traceability": { "score": 1, "judge": "manifest-sync", "rationale": "ok" },
     "cockpit-clarity": { "score": 0, "judge": "llm", "rationale": "worse" }
   },
-  "overall": 0.667,
+  "overall": 0.6666666666666666,
+  "deterministic_gate": "pass",
+  "approved_by": null
+}
+`;
+
+const SCORES_0002_REGRESSION = `{
+  "iteration": "0002-fixture",
+  "ticket": "0002",
+  "baseline": "0001-fixture",
+  "timestamp": "2026-09-11T01:00:00Z",
+  "criteria": {
+    "adr-traceability": { "score": 0.5, "judge": "manifest-sync", "rationale": "regressed" },
+    "cockpit-clarity": { "score": 1, "judge": "llm", "rationale": "improved" }
+  },
+  "overall": 0.6666666666666666,
   "deterministic_gate": "pass",
   "approved_by": null
 }
@@ -148,9 +165,9 @@ pr: null
 ---
 `;
 
-function addIteration0002(root: string): void {
+function addIteration0002(root: string, scores: string): void {
   write(root, "iterations/0002-fixture/ticket.md", TICKET_0002);
-  write(root, "iterations/0002-fixture/scores.json", SCORES_0002);
+  write(root, "iterations/0002-fixture/scores.json", scores);
   const entries = JSON.parse(readText(root, "manifest-of-iterations.json"));
   entries.iterations.push({
     id: "0002-fixture",
@@ -289,15 +306,32 @@ try {
     );
   }
 
-  // F — iteration scores below its baseline: gate fails closed.
+  // F1 — a criterion regresses against its last recorded score, even while a
+  // different criterion improves: the per-criterion gate must reject (no masking).
   {
     const root = makeTree();
     roots.push(root);
-    addIteration0002(root);
+    addIteration0002(root, SCORES_0002_REGRESSION);
     const sc = run(root, "scores-check.ts");
     expect(
-      "overall below baseline is rejected",
-      !sc.ok && sc.output.includes("baseline"),
+      "per-criterion regression (even when compensated) is rejected",
+      !sc.ok && sc.output.includes("per-criterion"),
+      sc.output,
+    );
+  }
+
+  // F2 — the bootstrap comparability wrinkle: an iteration exercising MORE
+  // criteria than its baseline, with an honest 0 on the new one. The old
+  // `overall ≥ baseline` gate rejected this; the amended per-criterion gate
+  // must pass it (the newly exercised criterion has no prior score).
+  {
+    const root = makeTree();
+    roots.push(root);
+    addIteration0002(root, SCORES_0002);
+    const sc = run(root, "scores-check.ts");
+    expect(
+      "expanded criteria set with new-criterion score passes (wrinkle fixed)",
+      sc.ok,
       sc.output,
     );
   }
