@@ -4,7 +4,7 @@ type: feature
 goal: Implement adr/0005 — promote the structural half of cockpit-clarity into the deterministic cockpit-surface criterion (checks/cockpit-surface.ts), narrow cockpit-clarity to the subjective residue, and record why loop-closure stays LLM-judged.
 constraint: each exercised criterion must not decrease against its last recorded score (baseline: iterations/0005-lint-gate/scores.json)
 adr_refs: [0005]
-pr: null
+pr: https://github.com/estherbrunner/teddy/pull/7
 ---
 
 ## Scope
