@@ -7,6 +7,8 @@ import { basename, dirname, join } from "node:path";
 import { existsSync, readdirSync } from "node:fs";
 import {
   exists,
+  isGitRepo,
+  mergeTrace,
   parseFrontmatter,
   parseRubric,
   readJson,
@@ -50,7 +52,6 @@ interface Scores {
   criteria: Record<string, ScoreEntry>;
   overall: number;
   deterministic_gate: string;
-  approved_by: string | null;
 }
 
 const registry = readJson<{ version: number; iterations: IterationEntry[] }>(
@@ -111,6 +112,9 @@ for (const entry of registry.iterations) {
   if (scores.deterministic_gate !== "pass") {
     fail(`${rel}: 'deterministic_gate' must be 'pass' (raw tests/lints are a hard gate)`);
   }
+  if ("approved_by" in scores) {
+    fail(`${rel}: legacy field 'approved_by' — removed by adr/0003 (closure is scribe-owned)`);
+  }
 
   // Ticket cross-checks.
   if (exists(root, entry.ticket)) {
@@ -163,14 +167,6 @@ for (const entry of registry.iterations) {
         `(weights from rubric.yaml, non-null criteria only)`,
     );
   }
-
-  // Human gate mirrors the ADR lifecycle: approved_by ⇔ closed.
-  if (scores.approved_by === null && entry.status !== "open") {
-    fail(`${rel}: approved_by is null but registry status is '${entry.status}' (must be 'open')`);
-  }
-  if (scores.approved_by !== null && entry.status !== "closed") {
-    fail(`${rel}: approved_by set but registry status is '${entry.status}' (must be 'closed')`);
-  }
 }
 
 // Baseline gate (adr/0001, amended by iteration 0003): paired per-criterion
@@ -201,10 +197,6 @@ for (const entry of registry.iterations) {
   const scores = scoresById.get(entry.id);
   if (!scores || entry.baseline === null) continue;
   if (!byId.has(entry.baseline)) continue; // already failed above
-  const baseScores = scoresById.get(entry.baseline);
-  if (scores.approved_by !== null && baseScores && baseScores.approved_by === null) {
-    fail(`${entry.scores}: cannot be closed while baseline '${entry.baseline}' is unapproved`);
-  }
   for (const [id, c] of Object.entries(scores.criteria)) {
     if (c.score === null) continue;
     const prior = latestPrior(id, entry);
@@ -213,6 +205,30 @@ for (const entry of registry.iterations) {
         `${entry.scores}: per-criterion regression: '${id}' scored ${c.score} < last recorded ` +
           `${prior.score} (${prior.from}) — score must not decrease (adr/0001, amended)`,
       );
+    }
+  }
+}
+
+// Closure gates (adr/0003): 'closed' is scribe-owned — it must trace to a
+// true merge commit touching the iteration directory (merge = approval), and
+// the baseline chain must close in order.
+for (const entry of registry.iterations) {
+  if (entry.status !== "closed") continue;
+  if (!isGitRepo(root)) {
+    fail(`${entry.scores}: cannot verify merge trace — not a git repository (adr/0003)`);
+    continue;
+  }
+  const trace = mergeTrace(root, `iterations/${entry.id}`);
+  if (!trace) {
+    fail(
+      `${entry.scores}: registry 'closed' but no merge commit touches iterations/${entry.id} ` +
+        `(merge = approval, adr/0003); squash/rebase merges defeat traceability`,
+    );
+  }
+  if (entry.baseline !== null) {
+    const baseEntry = byId.get(entry.baseline);
+    if (baseEntry && baseEntry.status !== "closed") {
+      fail(`${entry.scores}: closed while baseline '${entry.baseline}' is still open`);
     }
   }
 }

@@ -3,7 +3,6 @@ id: 0003
 status: proposed
 supersedes: null
 superseded_by: null
-approved_by: null
 rubric_refs: [adr-traceability]
 ---
 

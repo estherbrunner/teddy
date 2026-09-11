@@ -4,7 +4,6 @@
   "adrs": {
     "0001-teddy-bootstrap": {
       "status": "accepted",
-      "approved_by": "estherbrunner",
       "assertions": [
         "checks/manifest-sync.ts",
         "checks/scores-check.ts",
@@ -16,7 +15,6 @@
     },
     "0002-cockpit-minimal-scope": {
       "status": "accepted",
-      "approved_by": "estherbrunner",
       "assertions": [
         "checks/cockpit-report.ts"
       ],
@@ -26,10 +24,10 @@
     },
     "0003-github-native-approval": {
       "status": "proposed",
-      "approved_by": null,
       "assertions": [
         "checks/manifest-sync.ts",
-        "checks/scores-check.ts"
+        "checks/scores-check.ts",
+        "checks/scribe.ts"
       ],
       "criteria": [
         "adr-traceability"

@@ -1,6 +1,7 @@
 window.__TEDDY_DATA__ = {
   "version": 1,
   "generated_by": "checks/cockpit-report.ts",
+  "repository": "https://github.com/estherbrunner/teddy",
   "rubric": {
     "version": 1,
     "criteria": [
@@ -28,7 +29,6 @@ window.__TEDDY_DATA__ = {
     {
       "id": "0001-teddy-bootstrap",
       "status": "accepted",
-      "approved_by": "estherbrunner",
       "assertions": [
         "checks/manifest-sync.ts",
         "checks/scores-check.ts",
@@ -41,12 +41,23 @@ window.__TEDDY_DATA__ = {
     {
       "id": "0002-cockpit-minimal-scope",
       "status": "accepted",
-      "approved_by": "estherbrunner",
       "assertions": [
         "checks/cockpit-report.ts"
       ],
       "criteria": [
         "cockpit-clarity"
+      ]
+    },
+    {
+      "id": "0003-github-native-approval",
+      "status": "proposed",
+      "assertions": [
+        "checks/manifest-sync.ts",
+        "checks/scores-check.ts",
+        "checks/scribe.ts"
+      ],
+      "criteria": [
+        "adr-traceability"
       ]
     }
   ],
@@ -58,7 +69,6 @@ window.__TEDDY_DATA__ = {
       "timestamp": "2026-09-11T09:00:00Z",
       "overall": 1,
       "deterministic_gate": "pass",
-      "approved_by": "estherbrunner",
       "judge_surface": {
         "deterministic": 1,
         "total": 1
@@ -88,7 +98,6 @@ window.__TEDDY_DATA__ = {
       "timestamp": "2026-09-11T10:00:00Z",
       "overall": 1,
       "deterministic_gate": "pass",
-      "approved_by": "estherbrunner",
       "judge_surface": {
         "deterministic": 1,
         "total": 2
@@ -118,7 +127,6 @@ window.__TEDDY_DATA__ = {
       "timestamp": "2026-09-11T19:52:33Z",
       "overall": 1,
       "deterministic_gate": "pass",
-      "approved_by": "estherbrunner",
       "judge_surface": {
         "deterministic": 1,
         "total": 2
@@ -138,6 +146,35 @@ window.__TEDDY_DATA__ = {
           "score": 1,
           "judge": "llm",
           "rationale": "the gate-comparability defect flagged during bootstrap review (and concurred by the human) resolved within one iteration into both halves of the fork: adr/0001 amendment section 'paired per-criterion baseline gate' AND promotion into checks/scores-check.ts (chain-walk) with selftest cases F1/F2 proving the old gate's escape now passes and compensated regressions still fail. Structural evidence, checkable in the diff. If human review downgrades this score, that disagreement itself becomes the next loop-closure datum"
+        }
+      }
+    },
+    {
+      "id": "0004-github-native-approval",
+      "baseline": "0003-loop-closure",
+      "status": "open",
+      "timestamp": "2026-09-11T20:48:39Z",
+      "overall": 1,
+      "deterministic_gate": "pass",
+      "judge_surface": {
+        "deterministic": 1,
+        "total": 2
+      },
+      "criteria": {
+        "adr-traceability": {
+          "score": 1,
+          "judge": "manifest-sync",
+          "rationale": "checks/manifest-sync.ts passes: 3 ADRs resolve with manifest↔rubric parity and no orphans; accepted ADRs reconcile against merge history (grandfathered 0001/0002 per adr/0003); legacy approved_by rejected by both schema guards — verified in both directions by the 19-case selftest (git-backed fixtures)"
+        },
+        "cockpit-clarity": {
+          "score": 1,
+          "judge": "llm",
+          "rationale": "cockpit/main.ts keeps trend, ADR status, and judge-surface ratio on the single page and now renders the approval column as merge state (merged ✓ for accepted; ⚠ review & merge ↗ deep-linking to the repository's PR queue for pending items, per adr/0003) — no extra clicks. Self-judged pending human review; a downgrade here is the next loop-closure datum"
+        },
+        "loop-closure": {
+          "score": null,
+          "judge": "llm",
+          "rationale": "not exercised — adr/0003 was a directed design decision, not a judge/human disagreement"
         }
       }
     }

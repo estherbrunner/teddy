@@ -5,22 +5,21 @@
   "timestamp": "2026-09-11T20:48:39Z",
   "criteria": {
     "adr-traceability": {
-      "score": null,
+      "score": 1,
       "judge": "manifest-sync",
-      "rationale": "not yet exercised"
+      "rationale": "checks/manifest-sync.ts passes: 3 ADRs resolve with manifest↔rubric parity and no orphans; accepted ADRs reconcile against merge history (grandfathered 0001/0002 per adr/0003); legacy approved_by rejected by both schema guards — verified in both directions by the 19-case selftest (git-backed fixtures)"
     },
     "cockpit-clarity": {
-      "score": null,
+      "score": 1,
       "judge": "llm",
-      "rationale": "not yet exercised"
+      "rationale": "cockpit/main.ts keeps trend, ADR status, and judge-surface ratio on the single page and now renders the approval column as merge state (merged ✓ for accepted; ⚠ review & merge ↗ deep-linking to the repository's PR queue for pending items, per adr/0003) — no extra clicks. Self-judged pending human review; a downgrade here is the next loop-closure datum"
     },
     "loop-closure": {
       "score": null,
       "judge": "llm",
-      "rationale": "not yet exercised"
+      "rationale": "not exercised — adr/0003 was a directed design decision, not a judge/human disagreement"
     }
   },
-  "overall": 0,
-  "deterministic_gate": "pass",
-  "approved_by": null
+  "overall": 1,
+  "deterministic_gate": "pass"
 }

@@ -1,13 +1,14 @@
 ---
 name: adr-author
-description: Use when creating an ADR, amending one, or changing an ADR status in this repo — including the human-approval gate that must never be bypassed.
+description: Use when creating an ADR, amending one, or changing an ADR status in this repo — acceptance lands via a merged PR (merge = approval, adr/0003); agents never merge.
 ---
 
 # adr-author
 
 Scaffold and evolve decision records under `adr/`. The lifecycle is
-`proposed → accepted → deprecated | superseded`; every transition requires a
-human approver recorded in `approved_by`.
+`proposed → accepted → deprecated | superseded`. Since adr/0003, the approval
+is the merge: the branch carries the target status, and a human merging the
+PR *is* the approval — recorded by GitHub, not by any file field.
 
 ## Creating an ADR
 
@@ -20,7 +21,6 @@ id: NNNN
 status: proposed
 supersedes: null
 superseded_by: null
-approved_by: null
 rubric_refs: []
 ---
 
@@ -37,28 +37,33 @@ rubric_refs: []
 
 3. Fill in `rubric_refs` with criterion ids from `rubrics/rubric.yaml` (or
    propose new criteria in the same change).
-4. Add a matching entry to `manifest.json` (`status: proposed`,
-   `approved_by: null`, linked assertions/criteria).
+4. Add a matching entry to `manifest.json` (`status: proposed`, linked
+   assertions/criteria) and the `adrs:` section of `rubrics/rubric.yaml` —
+   the two must agree.
 5. Run `node checks/manifest-sync.ts` — it must pass before you commit.
 
 ## Changing status
 
-Only a human may approve. When the human says "accept ADR NNNN":
+Set the target `status` in the branch that implements the decision and open
+the PR. A human merges; the merge event *is* the approval. The check
+requires any non-`proposed` status to trace to a merge commit touching the
+ADR file — direct commits and squash/rebase merges are rejected.
 
-1. Set `status:` **and** `approved_by:` (the approver's name) in frontmatter.
-2. If superseding: set `supersedes:` on the new ADR and `superseded_by:` on the
-   old one — both directions, or the check fails.
-3. Run `node checks/manifest-sync.ts` (or `--fix` to sync manifest statuses).
+If superseding: set `supersedes:` on the new ADR and `superseded_by:` on the
+old one — both directions, or the check fails.
 
 ## Never
 
-- Set `approved_by` yourself, on your own suggestion, or because "it's obvious".
-- Transition status while `approved_by` is null — the check rejects it.
+- Reintroduce `approved_by` (or any approval field) — the check rejects the
+  legacy field; approval lives in GitHub's record.
+- Merge a PR yourself or ask to have one merged — agents never merge.
 - Edit files under `adr/` as part of an unrelated change; ADR changes are
   their own commit/PR.
 - Silence a `manifest-sync` failure by editing the check instead of the data.
 
 ## Red flags — stop
 
-- "The human obviously meant to approve" → you don't know that. Leave it `proposed`.
-- "I'll mark it accepted so the gate passes" → that is the gate working. Fix the substance.
+- "The PR is obviously going to be approved, I'll set accepted on main now" →
+  acceptance exists only after the human's merge, never before.
+- "I'll merge it so the gate records the approval" → the gate exists precisely
+  so that agents cannot do this.

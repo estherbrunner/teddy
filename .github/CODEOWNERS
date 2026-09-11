@@ -1,0 +1,5 @@
+# Approval gates are GitHub-native (adr/0003): code owners are automatically
+# requested for review; how strictly reviews are required (approval counts,
+# dismissal, bypass lists) each team configures in its repository rulesets.
+*       @estherbrunner
+/adr/   @estherbrunner

@@ -16,8 +16,8 @@ node checks/manifest-sync.ts          # verify; exit 1 lists failures
 node checks/manifest-sync.ts . --fix  # sync manifest statuses FROM frontmatter only
 ```
 
-`--fix` touches exactly two fields per ADR entry (`status`, `approved_by`).
-Links (assertions, criteria) are always hand-maintained.
+`--fix` touches exactly one field per ADR entry (`status`). Links (assertions,
+criteria) are always hand-maintained.
 
 ## What it enforces
 
@@ -26,7 +26,10 @@ Links (assertions, criteria) are always hand-maintained.
 - Every file under `checks/*.ts` (except `lib.ts`) is linked from ≥1 ADR —
   an unlinked check script is an **orphaned assertion** and fails the gate.
 - Manifest criteria ≡ `rubrics/rubric.yaml` `adrs:` section per ADR — no drift.
-- Status other than `proposed` requires non-null `approved_by` (human gate).
+- Any status other than `proposed` must trace to a true merge commit touching
+  the ADR file (merge = approval, adr/0003). Direct, squash, and rebase merges
+  don't count.
+- The legacy `approved_by` field is rejected wherever it reappears.
 
 ## After changing the rubric or manifest
 
@@ -35,13 +38,15 @@ If you added/renamed a criterion or moved an ADR link, also run
 
 ## Never
 
-- Delete a failing check, narrow its assertions, or add `// eslint-disable`-style
-  escapes to make the gate green. Failures are resolved by fixing data,
-  amending an ADR, or writing a new ADR.
+- Delete a failing check, narrow its assertions, or add disables to make the
+  gate green. Failures are resolved by fixing data, amending an ADR, or
+  writing a new ADR.
 - Link an assertion to an ADR it doesn't actually assert.
+- Extend the grandfathered-acceptance list in `checks/manifest-sync.ts`
+  without an ADR that documents why.
 
 ## Red flags — stop
 
-- "The orphan is harmless, I'll add a lib.ts-style exception" → exceptions to the
-  orphan rule belong in an ADR, not a code tweak.
+- "The orphan is harmless, I'll add a lib.ts-style exception" → exceptions to
+  the orphan rule belong in an ADR, not a code tweak.
 - "I'll relink the assertion to an easier ADR" → that falsifies traceability.

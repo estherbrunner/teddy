@@ -34,7 +34,8 @@ Note the disagreement in the iteration's PR so it becomes trackable.
 
 ## Never
 
-- Set or change `approved_by` — human gate, same as ADR status.
+- Merge a PR, or edit registry closure state — the scribe owns it at merge
+  time (adr/0003); agents never merge.
 - Transition ADR status as a side effect of scoring.
 - Score a criterion you cannot cite evidence for; leave it null instead.
 - Round a weak result up "because the trend is right" — report the number.
