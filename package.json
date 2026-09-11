@@ -1,0 +1,19 @@
+{
+  "name": "teddy",
+  "version": "0.1.0",
+  "description": "T(ypeScript) E(val-)D(riven) D(evelopment) + Y — a self-hosted eval-driven development harness. Its first project is itself.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "check": "node checks/manifest-sync.ts && node checks/scores-check.ts && node checks/cockpit-report.ts --check",
+    "report": "node checks/cockpit-report.ts",
+    "selftest": "node checks/selftest.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "test": "npm run selftest && npm run check && npm run typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.2"
+  }
+}

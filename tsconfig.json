@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "none",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmitOnError": true,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": ["cockpit/main.ts"]
+}
