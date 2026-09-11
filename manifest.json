@@ -32,6 +32,11 @@
       "criteria": [
         "adr-traceability"
       ]
+    },
+    "0004-lint-gate": {
+      "status": "proposed",
+      "assertions": [],
+      "criteria": []
     }
   }
 }

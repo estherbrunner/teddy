@@ -19,3 +19,5 @@ adrs:
     criteria: [cockpit-clarity]
   0003-github-native-approval:
     criteria: [adr-traceability]
+  0004-lint-gate:
+    criteria: []

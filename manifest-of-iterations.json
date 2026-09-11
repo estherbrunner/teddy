@@ -28,6 +28,13 @@
       "scores": "iterations/0004-github-native-approval/scores.json",
       "baseline": "0003-loop-closure",
       "status": "closed"
+    },
+    {
+      "id": "0005-lint-gate",
+      "ticket": "iterations/0005-lint-gate/ticket.md",
+      "scores": "iterations/0005-lint-gate/scores.json",
+      "baseline": "0004-github-native-approval",
+      "status": "open"
     }
   ]
 }

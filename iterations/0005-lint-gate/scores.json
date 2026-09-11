@@ -1,0 +1,25 @@
+{
+  "iteration": "0005-lint-gate",
+  "ticket": "0005",
+  "baseline": "0004-github-native-approval",
+  "timestamp": "2026-09-11T22:27:29Z",
+  "criteria": {
+    "adr-traceability": {
+      "score": null,
+      "judge": "manifest-sync",
+      "rationale": "not yet exercised"
+    },
+    "cockpit-clarity": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not yet exercised"
+    },
+    "loop-closure": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not yet exercised"
+    }
+  },
+  "overall": 0,
+  "deterministic_gate": "pass"
+}
