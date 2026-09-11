@@ -49,6 +49,10 @@ the PR. A human merges; the merge event *is* the approval. The check
 requires any non-`proposed` status to trace to a merge commit touching the
 ADR file — direct commits and squash/rebase merges are rejected.
 
+Because `manifest.json` is an input to the cockpit report, a status-change
+PR must also commit the regenerated `cockpit/data.js` (`npm run report`) —
+the scribe only writes derived state on `iteration/*` PRs (adr/0003).
+
 If superseding: set `supersedes:` on the new ADR and `superseded_by:` on the
 old one — both directions, or the check fails.
 

@@ -101,8 +101,7 @@ accounts; agents must never merge.
 
 ## Status
 
-ADRs 0001–0003 accepted; iterations 0001–0004 closed (latest: PR #3, the
-pre-merge scribe amendment). Iteration 0005 (`lint-gate`) implements adr/0004
-— a linter-agnostic deterministic `npm run lint` gate: the linter declared in
-`package.json` (Biome, ESLint, oxlint, standard, xo) runs from its
+ADRs 0001–0004 accepted; iterations 0001–0005 closed. PR #4 merged the
+lint gate (adr/0004): `npm run lint` detects the linter declared in
+`package.json` — Biome, ESLint, oxlint, standard, xo — and runs it from its
 lockfile-pinned local install; Teddy itself adopts Biome.
