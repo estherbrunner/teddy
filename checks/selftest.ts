@@ -4,7 +4,7 @@
 // the gates (adr/0003: merge = approval).
 // Usage: node checks/selftest.ts
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -225,6 +225,18 @@ function setRegistryStatus(root: string, id: string, status: string): void {
   const it = entries.iterations.find((e: { id: string }) => e.id === id);
   it.status = status;
   write(root, "manifest-of-iterations.json", JSON.stringify(entries, null, 2) + "\n");
+}
+
+// adr/0004 fixtures: a package.json declaring linters and fake local .bin
+// shims (exit codes only — the gate must run the lockfile-pinned binary,
+// never fetch anything).
+function pkgWith(deps: Record<string, string>): string {
+  return JSON.stringify({ name: "fixture", private: true, devDependencies: deps });
+}
+
+function fakeBin(root: string, name: string, code: number): void {
+  write(root, `node_modules/.bin/${name}`, `#!/bin/sh\nexit ${code}\n`);
+  chmodSync(join(root, "node_modules/.bin", name), 0o755);
 }
 
 let passed = 0;
@@ -461,6 +473,89 @@ try {
       "legacy approved_by in scores.json is rejected",
       !sc.ok && sc.output.includes("legacy"),
       sc.output,
+    );
+  }
+
+  // L1 — no supported linter declared: the gate skips with an explicit note
+  // (declaring a linter in package.json is the configuration — adr/0004).
+  {
+    const root = makeTree();
+    roots.push(root);
+    write(root, "package.json", pkgWith({ typescript: "^5.0.0" }));
+    const lint = run(root, "lint.ts");
+    expect(
+      "lint gate: no declared linter skips with a note",
+      lint.ok && lint.output.includes("no supported linter"),
+      lint.output,
+    );
+  }
+
+  // L2 — declared linter with a green local binary passes.
+  {
+    const root = makeTree();
+    roots.push(root);
+    write(root, "package.json", pkgWith({ "@biomejs/biome": "^1.0.0" }));
+    fakeBin(root, "biome", 0);
+    const lint = run(root, "lint.ts");
+    expect(
+      "lint gate: declared linter exits 0 — pass",
+      lint.ok && lint.output.includes("biome"),
+      lint.output,
+    );
+  }
+
+  // L3 — linter findings (non-zero exit) must fail the gate.
+  {
+    const root = makeTree();
+    roots.push(root);
+    write(root, "package.json", pkgWith({ "@biomejs/biome": "^1.0.0" }));
+    fakeBin(root, "biome", 1);
+    const lint = run(root, "lint.ts");
+    expect(
+      "lint gate: linter findings are rejected",
+      !lint.ok && lint.output.includes("exit code 1"),
+      lint.output,
+    );
+  }
+
+  // L4 — declared but not installed: a declared gate that cannot run is broken.
+  {
+    const root = makeTree();
+    roots.push(root);
+    write(root, "package.json", pkgWith({ eslint: "^9.0.0" }));
+    const lint = run(root, "lint.ts");
+    expect(
+      "lint gate: declared but not installed is rejected",
+      !lint.ok && lint.output.includes("not installed"),
+      lint.output,
+    );
+  }
+
+  // L5 — fixed priority order: the first supported linter in the table wins.
+  {
+    const root = makeTree();
+    roots.push(root);
+    write(root, "package.json", pkgWith({ eslint: "^9.0.0", "@biomejs/biome": "^1.0.0" }));
+    fakeBin(root, "biome", 0);
+    fakeBin(root, "eslint", 7);
+    const lint = run(root, "lint.ts");
+    expect(
+      "lint gate: priority order picks the first supported linter",
+      lint.ok && lint.output.includes("biome") && !lint.output.includes("eslint"),
+      lint.output,
+    );
+  }
+
+  // L6 — unparseable package.json: the gate cannot verify, fails closed.
+  {
+    const root = makeTree();
+    roots.push(root);
+    write(root, "package.json", "{ not json");
+    const lint = run(root, "lint.ts");
+    expect(
+      "lint gate: unparseable package.json is rejected",
+      !lint.ok && lint.output.includes("package.json"),
+      lint.output,
     );
   }
 } finally {

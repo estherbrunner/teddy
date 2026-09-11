@@ -35,7 +35,9 @@
     },
     "0004-lint-gate": {
       "status": "proposed",
-      "assertions": [],
+      "assertions": [
+        "checks/lint.ts"
+      ],
       "criteria": []
     }
   }

@@ -35,7 +35,8 @@ It runs `checks/lint.ts`, which:
 
 - No supported linter declared → the gate passes with an explicit skip
   note. Declaring a linter in `package.json` *is* the configuration; teams
-  that don't want a lint leg simply don't declare one.
+  that don't want a lint leg simply don't declare one. A repository without
+  a root `package.json` skips for the same reason: nothing can be declared.
 - Linter declared but not installed → failure ("run npm install") — a
   declared gate that cannot run is a broken gate.
 - Unparseable `package.json` → failure (the gate cannot verify).
