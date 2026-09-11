@@ -4,7 +4,7 @@ type: feature
 goal: Implement adr/0003 — replace file-level approval fields with GitHub-native gates (merge-as-approval, scribe-owned derived state, CODEOWNERS + ruleset docs, cockpit PR deep-links).
 constraint: each exercised criterion must not decrease against its last recorded score (baseline: iterations/0003-loop-closure/scores.json)
 adr_refs: [0003]
-pr: null
+pr: https://github.com/estherbrunner/teddy/pull/2
 ---
 
 ## Scope
