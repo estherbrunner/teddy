@@ -1,0 +1,26 @@
+{
+  "iteration": "0002-cockpit-minimal-scope",
+  "ticket": "0002",
+  "baseline": "0001-teddy-bootstrap",
+  "timestamp": "2026-09-11T10:00:00Z",
+  "criteria": {
+    "adr-traceability": {
+      "score": 1,
+      "judge": "manifest-sync",
+      "rationale": "checks/manifest-sync.ts passes with cockpit-report.ts linked to adr/0002; no orphans introduced"
+    },
+    "cockpit-clarity": {
+      "score": 1,
+      "judge": "llm",
+      "rationale": "cockpit/main.ts render() draws the overall trend with baseline delta, per-criterion small multiples with hover rationales, the ADR status table with pending-approval chips, and the judge-surface bars — all on one page with no navigation (criterion's literal terms). Self-judged at bootstrap; subject to human review on merge — a downgrade here would trigger the loop-closure path"
+    },
+    "loop-closure": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not exercised — no judge/human disagreement cycle has occurred yet"
+    }
+  },
+  "overall": 1,
+  "deterministic_gate": "pass",
+  "approved_by": null
+}

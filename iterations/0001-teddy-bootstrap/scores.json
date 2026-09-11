@@ -1,0 +1,26 @@
+{
+  "iteration": "0001-teddy-bootstrap",
+  "ticket": "0001",
+  "baseline": null,
+  "timestamp": "2026-09-11T09:00:00Z",
+  "criteria": {
+    "adr-traceability": {
+      "score": 1,
+      "judge": "manifest-sync",
+      "rationale": "checks/manifest-sync.ts passes: both ADRs resolve to linked assertions/criteria, no orphaned ADRs or assertions, rubric.yaml agrees with manifest.json; gate verified to reject unapproved transitions and orphans by checks/selftest.ts"
+    },
+    "cockpit-clarity": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not exercised — the cockpit does not exist until iteration 0002"
+    },
+    "loop-closure": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not exercised — no judge/human disagreement cycle has occurred yet"
+    }
+  },
+  "overall": 1,
+  "deterministic_gate": "pass",
+  "approved_by": null
+}
