@@ -1,0 +1,30 @@
+{
+  "iteration": "0006-judge-surface-promotion",
+  "ticket": "0006",
+  "baseline": "0005-lint-gate",
+  "timestamp": "2026-09-11T23:15:52Z",
+  "criteria": {
+    "adr-traceability": {
+      "score": null,
+      "judge": "manifest-sync",
+      "rationale": "not yet exercised"
+    },
+    "cockpit-clarity": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not yet exercised"
+    },
+    "loop-closure": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not yet exercised"
+    },
+    "cockpit-surface": {
+      "score": null,
+      "judge": "cockpit-surface",
+      "rationale": "not yet exercised"
+    }
+  },
+  "overall": 0,
+  "deterministic_gate": "pass"
+}

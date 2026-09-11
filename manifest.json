@@ -39,6 +39,13 @@
         "checks/lint.ts"
       ],
       "criteria": []
+    },
+    "0005-judge-surface-promotion": {
+      "status": "proposed",
+      "assertions": [],
+      "criteria": [
+        "cockpit-surface"
+      ]
     }
   }
 }

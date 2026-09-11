@@ -5,13 +5,17 @@ criteria:
     weight: 2
     judge: manifest-sync   # deterministic: scores 0 or 1
   - id: cockpit-clarity
-    description: Dashboard surfaces trend, ADR status, and judge/deterministic ratio without extra clicks
+    description: Dashboard is clear and legible — visual quality beyond the structural surface pinned by cockpit-surface
     weight: 1
     judge: llm
   - id: loop-closure
     description: Disagreements between judge and human resolve into an ADR amendment or promoted assertion within one iteration
     weight: 3
     judge: llm
+  - id: cockpit-surface
+    description: Dashboard structurally surfaces trend, ADR status, and judge/deterministic ratio on a single page from precomputed data
+    weight: 2
+    judge: cockpit-surface   # deterministic: scores 0 or 1
 adrs:
   0001-teddy-bootstrap:
     criteria: [adr-traceability]
@@ -21,3 +25,5 @@ adrs:
     criteria: [adr-traceability]
   0004-lint-gate:
     criteria: []
+  0005-judge-surface-promotion:
+    criteria: [cockpit-surface]
