@@ -1,6 +1,6 @@
 ---
 id: 0004
-status: proposed
+status: accepted
 supersedes: null
 superseded_by: null
 rubric_refs: []
