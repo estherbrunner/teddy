@@ -5,14 +5,16 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "lint": "node checks/lint.ts",
     "check": "node checks/manifest-sync.ts && node checks/scores-check.ts && node checks/cockpit-report.ts --check",
     "report": "node checks/cockpit-report.ts",
     "selftest": "node checks/selftest.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
-    "test": "npm run selftest && npm run check && npm run typecheck"
+    "test": "npm run lint && npm run selftest && npm run check && npm run typecheck"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.11",
     "@types/node": "^24.0.0",
     "typescript": "^5.9.2"
   }

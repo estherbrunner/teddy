@@ -17,7 +17,6 @@ import {
   readText,
   writeText,
   type AdrInfo,
-  type Frontmatter,
 } from "./lib.ts";
 
 const args = process.argv.slice(2);
@@ -34,7 +33,7 @@ try {
 
 const manifestPath = "manifest.json";
 const manifest = readJson<Record<string, unknown>>(root, manifestPath);
-const adrs = manifest["adrs"] as
+const adrs = manifest.adrs as
   | Record<string, { status: string; assertions: string[]; criteria: string[] }>
   | undefined;
 if (!adrs || typeof adrs !== "object") {
@@ -64,12 +63,12 @@ function verify(): string[] {
   const fail = (msg: string): void => {
     fails.push(msg);
   };
-  const unclaimed = new Set(Object.keys(adrs!));
+  const unclaimed = new Set(Object.keys(adrs));
 
   for (const adr of parsed) {
     const { file, slug, fm } = adr;
-    const id = fm["id"];
-    const status = fm["status"];
+    const id = fm.id;
+    const status = fm.status;
     if (typeof id !== "string" || !slug.startsWith(`${id}-`)) {
       fail(`${file}: frontmatter id '${id}' does not match filename slug '${slug}'`);
     }
@@ -97,27 +96,27 @@ function verify(): string[] {
         }
       }
     }
-    for (const ref of strArray(fm["rubric_refs"])) {
+    for (const ref of strArray(fm.rubric_refs)) {
       if (!rubric.criteria[ref]) fail(`${file}: rubric_refs references unknown criterion '${ref}'`);
     }
-    const supersedes = fm["supersedes"];
-    const supersededBy = fm["superseded_by"];
+    const supersedes = fm.supersedes;
+    const supersededBy = fm.superseded_by;
     if (typeof supersedes === "string") {
       const target = parsed.find((a) => a.slug === supersedes);
       if (!target) fail(`${file}: supersedes '${supersedes}' does not exist`);
-      else if (target.fm["superseded_by"] !== slug) {
-        fail(`${file}: supersedes '${supersedes}' but backref superseded_by is '${target.fm["superseded_by"]}'`);
+      else if (target.fm.superseded_by !== slug) {
+        fail(`${file}: supersedes '${supersedes}' but backref superseded_by is '${target.fm.superseded_by}'`);
       }
     }
     if (typeof supersededBy === "string") {
       const target = parsed.find((a) => a.slug === supersededBy);
       if (!target) fail(`${file}: superseded_by '${supersededBy}' does not exist`);
-      else if (target.fm["supersedes"] !== slug) {
+      else if (target.fm.supersedes !== slug) {
         fail(`${file}: superseded_by '${supersededBy}' but that ADR does not list '${slug}' in supersedes`);
       }
     }
 
-    const entry = adrs![slug];
+    const entry = adrs?.[slug];
     if (!entry) {
       fail(`manifest.json: missing entry for ADR '${slug}'`);
       continue;
@@ -178,12 +177,12 @@ function applyStatusFix(): void {
   // Mutate the in-memory manifest that verify() reads, then write that same
   // object — otherwise re-verification runs against stale values.
   for (const adr of parsed) {
-    const entry = adrs![adr.slug];
+    const entry = adrs?.[adr.slug];
     if (entry) {
-      entry.status = adr.fm["status"] as string;
+      entry.status = adr.fm.status as string;
     }
   }
-  writeText(root, manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+  writeText(root, manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 let fails = verify();

@@ -55,7 +55,7 @@ const hadData = existsSync(join(root, dataPath));
 const originalData = hadData ? readText(root, dataPath) : null;
 
 entry.status = "closed";
-writeText(root, registryPath, JSON.stringify(registry, null, 2) + "\n");
+writeText(root, registryPath, `${JSON.stringify(registry, null, 2)}\n`);
 spawnSync(process.execPath, [join(checksDir, "cockpit-report.ts"), root], {
   encoding: "utf8",
   stdio: "inherit",

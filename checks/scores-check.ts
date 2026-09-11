@@ -22,7 +22,7 @@ function fail(msg: string): void {
   fails.push(msg);
 }
 
-let rubric;
+let rubric: ReturnType<typeof parseRubric>;
 try {
   rubric = parseRubric(readText(root, "rubrics/rubric.yaml"));
 } catch (e) {
@@ -119,10 +119,10 @@ for (const entry of registry.iterations) {
   // Ticket cross-checks.
   if (exists(root, entry.ticket)) {
     const { fm } = parseFrontmatter(readText(root, entry.ticket), entry.ticket);
-    if (fm["id"] !== scores.ticket) {
-      fail(`${entry.ticket}: id '${fm["id"]}' does not match scores ticket '${scores.ticket}'`);
+    if (fm.id !== scores.ticket) {
+      fail(`${entry.ticket}: id '${fm.id}' does not match scores ticket '${scores.ticket}'`);
     }
-    const type = fm["type"];
+    const type = fm.type;
     if (typeof type !== "string" || !["feature", "bugfix", "skill", "decision", "refactor"].includes(type)) {
       fail(`${entry.ticket}: invalid type '${type}'`);
     }
@@ -131,7 +131,7 @@ for (const entry of registry.iterations) {
         fail(`${entry.ticket}: missing required field '${key}'`);
       }
     }
-    if (!Array.isArray(fm["adr_refs"])) fail(`${entry.ticket}: missing required field 'adr_refs'`);
+    if (!Array.isArray(fm.adr_refs)) fail(`${entry.ticket}: missing required field 'adr_refs'`);
     if (!("pr" in fm)) fail(`${entry.ticket}: missing required field 'pr' (null until the PR opens)`);
   }
 
