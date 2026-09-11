@@ -229,6 +229,25 @@ try {
     expect("accepted ADR with approval passes gate", ms.ok, ms.output);
   }
 
+  // I — --fix resolves status drift and must exit clean, not report
+  // the pre-fix failures.
+  {
+    const root = makeTree();
+    roots.push(root);
+    write(
+      root,
+      "adr/0001-fixture.md",
+      ADR.replace("status: proposed", "status: accepted").replace(
+        "approved_by: null",
+        'approved_by: "estherbrunner"',
+      ),
+    );
+    const first = run(root, "manifest-sync.ts", "--fix");
+    expect("manifest-sync --fix syncs drift and exits 0", first.ok, first.output);
+    const second = run(root, "manifest-sync.ts");
+    expect("manifest-sync passes after --fix", second.ok, second.output);
+  }
+
   // C — orphaned assertion: checks/*.ts not linked from manifest.json.
   {
     const root = makeTree();
