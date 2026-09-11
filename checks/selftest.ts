@@ -38,7 +38,9 @@ function runEnv(
 ): SpawnResult {
   const res = spawnSync(process.execPath, [join(checksDir, script), ...args, root], {
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    // Pin the event context: fixtures must not inherit CI's pull_request
+    // environment (strict local semantics unless a case asks otherwise).
+    env: { ...process.env, GITHUB_EVENT_NAME: "push", ...env },
   });
   return {
     ok: res.status === 0,
