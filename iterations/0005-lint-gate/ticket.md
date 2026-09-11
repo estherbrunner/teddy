@@ -4,7 +4,7 @@ type: feature
 goal: Implement adr/0004 — a deterministic `npm run lint` gate that detects the declared linter from package.json (biome, eslint, oxlint, standard, xo) and runs its lockfile-pinned local binary; Teddy itself adopts Biome.
 constraint: each exercised criterion must not decrease against its last recorded score (baseline: iterations/0004-github-native-approval/scores.json)
 adr_refs: [0004]
-pr: null
+pr: https://github.com/estherbrunner/teddy/pull/4
 ---
 
 ## Scope
