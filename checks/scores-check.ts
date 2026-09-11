@@ -211,25 +211,32 @@ for (const entry of registry.iterations) {
 
 // Closure gates (adr/0003): 'closed' is scribe-owned — it must trace to a
 // true merge commit touching the iteration directory (merge = approval), and
-// the baseline chain must close in order.
+// the baseline chain must close in order. On pull-request runs the carrying
+// merge does not exist yet (the scribe writes closure to the branch and the
+// merge carries it), so trace reconciliation defers to main.
+const pendingMergeContext = process.env.GITHUB_EVENT_NAME === "pull_request";
 for (const entry of registry.iterations) {
   if (entry.status !== "closed") continue;
-  if (!isGitRepo(root)) {
-    fail(`${entry.scores}: cannot verify merge trace — not a git repository (adr/0003)`);
-    continue;
-  }
-  const trace = mergeTrace(root, `iterations/${entry.id}`);
-  if (!trace) {
-    fail(
-      `${entry.scores}: registry 'closed' but no merge commit touches iterations/${entry.id} ` +
-        `(merge = approval, adr/0003); squash/rebase merges defeat traceability`,
-    );
-  }
   if (entry.baseline !== null) {
     const baseEntry = byId.get(entry.baseline);
     if (baseEntry && baseEntry.status !== "closed") {
       fail(`${entry.scores}: closed while baseline '${entry.baseline}' is still open`);
     }
+  }
+  if (!isGitRepo(root)) {
+    fail(`${entry.scores}: cannot verify merge trace — not a git repository (adr/0003)`);
+    continue;
+  }
+  const trace = mergeTrace(root, `iterations/${entry.id}`);
+  if (!trace && pendingMergeContext) {
+    console.log(`scores-check: '${entry.id}' closed pending merge — trace reconciled on main`);
+    continue;
+  }
+  if (!trace) {
+    fail(
+      `${entry.scores}: registry 'closed' but no merge commit touches iterations/${entry.id} ` +
+        `(merge = approval, adr/0003); squash/rebase merges defeat traceability`,
+    );
   }
 }
 

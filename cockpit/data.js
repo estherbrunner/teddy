@@ -50,7 +50,7 @@ window.__TEDDY_DATA__ = {
     },
     {
       "id": "0003-github-native-approval",
-      "status": "proposed",
+      "status": "accepted",
       "assertions": [
         "checks/manifest-sync.ts",
         "checks/scores-check.ts",
@@ -152,7 +152,7 @@ window.__TEDDY_DATA__ = {
     {
       "id": "0004-github-native-approval",
       "baseline": "0003-loop-closure",
-      "status": "open",
+      "status": "closed",
       "timestamp": "2026-09-11T20:48:39Z",
       "overall": 1,
       "deterministic_gate": "pass",

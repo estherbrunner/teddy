@@ -1,30 +1,30 @@
 name: scribe
 on:
   pull_request:
-    types: [closed]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   scribe:
-    # Records the merge — the only writer of derived state (adr/0003):
-    # closes the iteration in the registry and regenerates cockpit/data.js.
-    if: github.event.pull_request.merged == true
+    # Closes the iteration on the branch once the gates are green; the merge
+    # carries the derived state into main — no post-merge push, no ruleset
+    # bypass (adr/0003, as amended).
+    if: startsWith(github.event.pull_request.head.ref, 'iteration/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
-          # If your ruleset blocks github-actions[bot] pushes, either bypass-
-          # list the bot or provide a fine-grained PAT with contents:write.
-          token: ${{ secrets.SCRIBE_TOKEN || github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: 26
       - run: npm ci
       - run: node checks/scribe.ts
+        env:
+          GITHUB_EVENT_NAME: pull_request
       - name: Commit and push
         run: |
           if git diff --quiet; then
@@ -34,5 +34,5 @@ jobs:
           git config user.name "teddy-scribe[bot]"
           git config user.email "teddy-scribe[bot]@users.noreply.github.com"
           git add -A
-          git commit -qm "scribe: close ${{ github.event.pull_request.head.ref }} (PR #${{ github.event.pull_request.number }})"
-          git push origin main
+          git commit -qm "scribe: close ${{ github.event.pull_request.head.ref }}"
+          git push origin ${{ github.event.pull_request.head.ref }}
