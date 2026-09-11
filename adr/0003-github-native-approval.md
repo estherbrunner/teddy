@@ -1,6 +1,6 @@
 ---
 id: 0003
-status: proposed
+status: accepted
 supersedes: null
 superseded_by: null
 rubric_refs: [adr-traceability]
@@ -40,10 +40,10 @@ via direct commits before this ADR existed) and iterations 0001–0003
 (closed via PR #1).
 
 **Derived state is written only by a deterministic script.** The registry
-`status: closed` flip and `cockpit/data.js` regeneration are performed by a
-post-merge GitHub Actions workflow (the *scribe*) reacting to
-`pull_request.closed && merged` — never by human or agent hand edits. The
-repository ruleset bypass-lists the scribe's bot identity only.
+`status: closed` flip and `cockpit/data.js` regeneration are performed by the
+*scribe* — never by human or agent hand edits. As amended below, the scribe
+runs on the iteration PR (pre-merge), so the merge itself carries the derived
+state.
 
 **Gates are configured by each team; Teddy prescribes the mechanism, not
 the numbers.** The recommended setup is a CODEOWNERS file plus a repository
@@ -87,3 +87,20 @@ state comes to belong to the scribe.
 - **Technical prevention of agent-merges with owner tokens** — no available
   primitive distinguishes a human merge from an agent merge using the
   owner's token; policy plus account separation is the honest position.
+
+## Amendment — pre-merge scribe (no bypass)
+
+The original decision had the scribe running post-merge and pushing straight
+to `main`, with the ruleset bypass-listing "the scribe's bot identity only".
+That assumption failed on first contact: `github-actions[bot]` cannot be
+added to a ruleset bypass list, and the push was rejected — "changes must be
+made through a pull request".
+
+Amended: the scribe runs **on the iteration PR itself**. On every push to an
+`iteration/*` branch it attempts the closure (registry `closed` + fresh
+`cockpit/data.js`), keeps it only if every gate is green with it in place,
+and reverts otherwise. The merge then carries the derived state into `main` —
+semantically identical to an ADR branch carrying `accepted`: the file
+proposes, the merge realizes. No bypass, no PAT, no post-merge push.
+`scores-check` defers closure-trace reconciliation to `main` on pull-request
+runs (the carrying merge does not exist yet) and enforces it everywhere else.

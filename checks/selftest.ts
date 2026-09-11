@@ -27,8 +27,18 @@ function gitc(root: string, ...args: string[]): void {
 }
 
 function run(root: string, script: string, ...args: string[]): SpawnResult {
+  return runEnv(root, {}, script, ...args);
+}
+
+function runEnv(
+  root: string,
+  env: Record<string, string>,
+  script: string,
+  ...args: string[]
+): SpawnResult {
   const res = spawnSync(process.execPath, [join(checksDir, script), ...args, root], {
     encoding: "utf8",
+    env: { ...process.env, ...env },
   });
   return {
     ok: res.status === 0,
@@ -403,6 +413,16 @@ try {
     gitc(root, "merge", "-q", "--no-ff", "feat", "-m", "Merge pull request #10 from t/close");
     const sc = run(root, "scores-check.ts");
     expect("closed iteration with merge trace passes", sc.ok, sc.output);
+  }
+
+  // J3 — closed on a PR branch: the carrying merge does not exist yet, so the
+  // trace reconciliation defers to main (github events only; local stays strict).
+  {
+    const root = makeTree();
+    roots.push(root);
+    setRegistryStatus(root, "0001-fixture", "closed");
+    const sc = runEnv(root, { GITHUB_EVENT_NAME: "pull_request" }, "scores-check.ts");
+    expect("closed iteration on a PR branch defers trace to main", sc.ok, sc.output);
   }
 
   // K — legacy field guards: reintroducing approved_by anywhere fails.

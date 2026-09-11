@@ -26,8 +26,8 @@ Orphaned ADRs *and* orphaned assertions are failures.
 ```
 ticket → branch → implement → deterministic gates (hard) → rubric-judge scores
       → per-criterion non-regression vs last recorded score (fails closed)
-      → PR with scores diff → human merges — merge = approval (adr/0003)
-      → scribe closes the iteration + refreshes the cockpit → new baseline
+      → scribe closes the iteration on the branch once gates are green
+      → human merges — merge = approval, carrying the closure (adr/0003) → new baseline
 ```
 
 Per iteration (`iterations/NNNN-slug/`): a `ticket.md` and a `scores.json` snapshot.
@@ -87,11 +87,11 @@ the mechanism; each team configures the strictness to its trust level:
    *Require a pull request before merging* (no direct pushes), *Dismiss stale
    reviews*, *Require review from Code Owners*. Required approval counts,
    reviewer sets, and bypass lists are the team's call.
-3. **Scribe** (`.github/workflows/scribe.yml`) — on merge, closes the
-   iteration in the registry and regenerates `cockpit/data.js`. It is the only
-   writer of derived state. If your ruleset blocks `github-actions[bot]`
-   pushes, bypass-list the bot or give the workflow a fine-grained PAT
-   (`SCRIBE_TOKEN`, contents: write).
+3. **Scribe** (`.github/workflows/scribe.yml`) — runs on `iteration/*` PRs:
+   once the gates are green it closes the iteration in the registry and
+   regenerates `cockpit/data.js` **on the branch**, so the merge itself
+   carries the derived state. It is the only writer of derived state — no
+   ruleset bypass, no PAT, no post-merge push.
 
 Trust boundary (adr/0003): actors with owner permissions are indistinguishable
 from humans. Teams wanting less-privileged agents run them on dedicated

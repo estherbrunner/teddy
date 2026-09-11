@@ -23,7 +23,7 @@
       ]
     },
     "0003-github-native-approval": {
-      "status": "proposed",
+      "status": "accepted",
       "assertions": [
         "checks/manifest-sync.ts",
         "checks/scores-check.ts",
