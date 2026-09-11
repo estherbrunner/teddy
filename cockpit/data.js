@@ -54,11 +54,11 @@ window.__TEDDY_DATA__ = {
     {
       "id": "0001-teddy-bootstrap",
       "baseline": null,
-      "status": "open",
+      "status": "closed",
       "timestamp": "2026-09-11T09:00:00Z",
       "overall": 1,
       "deterministic_gate": "pass",
-      "approved_by": null,
+      "approved_by": "estherbrunner",
       "judge_surface": {
         "deterministic": 1,
         "total": 1
@@ -84,11 +84,11 @@ window.__TEDDY_DATA__ = {
     {
       "id": "0002-cockpit-minimal-scope",
       "baseline": "0001-teddy-bootstrap",
-      "status": "open",
+      "status": "closed",
       "timestamp": "2026-09-11T10:00:00Z",
       "overall": 1,
       "deterministic_gate": "pass",
-      "approved_by": null,
+      "approved_by": "estherbrunner",
       "judge_surface": {
         "deterministic": 1,
         "total": 2
@@ -114,11 +114,11 @@ window.__TEDDY_DATA__ = {
     {
       "id": "0003-loop-closure",
       "baseline": "0002-cockpit-minimal-scope",
-      "status": "open",
+      "status": "closed",
       "timestamp": "2026-09-11T19:52:33Z",
       "overall": 1,
       "deterministic_gate": "pass",
-      "approved_by": null,
+      "approved_by": "estherbrunner",
       "judge_surface": {
         "deterministic": 1,
         "total": 2
