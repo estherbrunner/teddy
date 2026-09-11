@@ -62,7 +62,7 @@ window.__TEDDY_DATA__ = {
     },
     {
       "id": "0004-lint-gate",
-      "status": "proposed",
+      "status": "accepted",
       "assertions": [
         "checks/lint.ts"
       ],
