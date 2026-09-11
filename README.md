@@ -65,6 +65,7 @@ checks/                     deterministic assertions
   manifest-sync.ts          traceability gate + merge-as-approval lifecycle gate
   scores-check.ts           scores schema + per-criterion baseline gate
   cockpit-report.ts         regenerates/verifies cockpit/data.js
+  cockpit-surface.ts        deterministic judge: the cockpit's structural surfaces (adr/0005)
   scribe.ts                 the one writer of derived state — runs in CI on the iteration PR
   lint.ts                   lint gate: runs the linter declared in package.json (adr/0004)
   selftest.ts               verifies the checks themselves (fail + pass paths)
@@ -101,7 +102,8 @@ accounts; agents must never merge.
 
 ## Status
 
-ADRs 0001–0004 accepted; iterations 0001–0005 closed. PR #4 merged the
-lint gate (adr/0004): `npm run lint` detects the linter declared in
-`package.json` — Biome, ESLint, oxlint, standard, xo — and runs it from its
-lockfile-pinned local install; Teddy itself adopts Biome.
+ADRs 0001–0004 accepted; iterations 0001–0005 closed. Iteration 0006
+(`judge-surface-promotion`) implements adr/0005 — promoting the structural
+half of `cockpit-clarity` into the deterministic `cockpit-surface` criterion
+(judge surface: 2/4 deterministic); `loop-closure` stays LLM-judged, the
+documented floor.

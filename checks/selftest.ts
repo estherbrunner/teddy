@@ -239,6 +239,30 @@ function fakeBin(root: string, name: string, code: number): void {
   chmodSync(join(root, "node_modules/.bin", name), 0o755);
 }
 
+// adr/0005 fixtures: a minimal cockpit tree that satisfies every structural
+// pin of the cockpit-surface gate. Cases break one surface at a time.
+const COCKPIT_DATA = `window.__TEDDY_DATA__ = {
+  "iterations": [{ "overall": 1, "judge_surface": { "deterministic": 1, "total": 1 } }],
+  "adrs": [{ "id": "0001-fixture", "status": "accepted" }]
+};
+`;
+const COCKPIT_HTML = `<!doctype html>
+<html><body><div id="app"></div><script src="data.js"></script><script src="main.js"></script></body></html>
+`;
+const COCKPIT_MAIN = `const data = (window as unknown as { __TEDDY_DATA__: unknown }).__TEDDY_DATA__;
+function lineChart(values: number[]): number[] { return values; }
+const overall = 1;
+const judge_surface = { deterministic: 1, total: 1 };
+const status = "accepted";
+document.getElementById("app");
+`;
+
+function cockpitTree(root: string, data = COCKPIT_DATA, html = COCKPIT_HTML, main = COCKPIT_MAIN): void {
+  write(root, "cockpit/data.js", data);
+  write(root, "cockpit/index.html", html);
+  write(root, "cockpit/main.ts", main);
+}
+
 let passed = 0;
 let failed = 0;
 
@@ -556,6 +580,78 @@ try {
       "lint gate: unparseable package.json is rejected",
       !lint.ok && lint.output.includes("package.json"),
       lint.output,
+    );
+  }
+
+  // P1 — a cockpit tree carrying all three surfaces passes its gate.
+  {
+    const root = makeTree();
+    roots.push(root);
+    cockpitTree(root);
+    const cs = run(root, "cockpit-surface.ts");
+    expect(
+      "cockpit-surface: complete cockpit tree passes",
+      cs.ok && cs.output.includes("OK"),
+      cs.output,
+    );
+  }
+
+  // P2 — data.js without the judge/deterministic ratio cannot surface it.
+  {
+    const root = makeTree();
+    roots.push(root);
+    cockpitTree(
+      root,
+      COCKPIT_DATA.replace(`, "judge_surface": { "deterministic": 1, "total": 1 }`, ""),
+    );
+    const cs = run(root, "cockpit-surface.ts");
+    expect(
+      "cockpit-surface: missing judge_surface is rejected",
+      !cs.ok && cs.output.includes("judge_surface"),
+      cs.output,
+    );
+  }
+
+  // P3 — more than one #app root: not a single page.
+  {
+    const root = makeTree();
+    roots.push(root);
+    cockpitTree(
+      root,
+      COCKPIT_DATA,
+      COCKPIT_HTML.replace(`<div id="app"></div>`, `<div id="app"></div><div id="app"></div>`),
+    );
+    const cs = run(root, "cockpit-surface.ts");
+    expect(
+      "cockpit-surface: multiple #app roots are rejected",
+      !cs.ok && cs.output.includes("exactly one"),
+      cs.output,
+    );
+  }
+
+  // P4 — navigation away from the single page breaks the no-extra-clicks pin.
+  {
+    const root = makeTree();
+    roots.push(root);
+    cockpitTree(root, COCKPIT_DATA, COCKPIT_HTML, `${COCKPIT_MAIN}location.href = "next.html";\n`);
+    const cs = run(root, "cockpit-surface.ts");
+    expect(
+      "cockpit-surface: page navigation is rejected",
+      !cs.ok && cs.output.includes("navigation"),
+      cs.output,
+    );
+  }
+
+  // P5 — an out-of-range overall poisons the trend surface.
+  {
+    const root = makeTree();
+    roots.push(root);
+    cockpitTree(root, COCKPIT_DATA.replace(`"overall": 1`, `"overall": 2`));
+    const cs = run(root, "cockpit-surface.ts");
+    expect(
+      "cockpit-surface: out-of-range overall is rejected",
+      !cs.ok && cs.output.includes("overall"),
+      cs.output,
     );
   }
 } finally {

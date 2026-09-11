@@ -42,7 +42,9 @@
     },
     "0005-judge-surface-promotion": {
       "status": "proposed",
-      "assertions": [],
+      "assertions": [
+        "checks/cockpit-surface.ts"
+      ],
       "criteria": [
         "cockpit-surface"
       ]
