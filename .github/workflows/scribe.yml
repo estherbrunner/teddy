@@ -1,0 +1,38 @@
+name: scribe
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  scribe:
+    # Records the merge — the only writer of derived state (adr/0003):
+    # closes the iteration in the registry and regenerates cockpit/data.js.
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          # If your ruleset blocks github-actions[bot] pushes, either bypass-
+          # list the bot or provide a fine-grained PAT with contents:write.
+          token: ${{ secrets.SCRIBE_TOKEN || github.token }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - run: npm ci
+      - run: node checks/scribe.ts
+      - name: Commit and push
+        run: |
+          if git diff --quiet; then
+            echo "scribe: nothing to record"
+            exit 0
+          fi
+          git config user.name "teddy-scribe[bot]"
+          git config user.email "teddy-scribe[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "scribe: close ${{ github.event.pull_request.head.ref }} (PR #${{ github.event.pull_request.number }})"
+          git push origin main

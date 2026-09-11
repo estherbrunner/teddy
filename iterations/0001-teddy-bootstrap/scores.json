@@ -21,6 +21,5 @@
     }
   },
   "overall": 1,
-  "deterministic_gate": "pass",
-  "approved_by": "estherbrunner"
+  "deterministic_gate": "pass"
 }

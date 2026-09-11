@@ -1,14 +1,17 @@
 // Deterministic traceability gate (serves rubric criterion 'adr-traceability').
-// Verifies: ADR frontmatter integrity, the human-approval lifecycle gate,
-// manifest.json ↔ adr ↔ rubric.yaml consistency, and orphan detection.
+// Verifies: ADR frontmatter integrity, the merge-as-approval lifecycle gate
+// (adr/0003), manifest.json ↔ adr ↔ rubric.yaml consistency, and orphan
+// detection.
 // Usage: node checks/manifest-sync.ts [root] [--fix]
 // Exit 0 = consistent, 1 = failures listed below. --fix syncs manifest
 // statuses from ADR frontmatter, then re-verifies and reports what remains.
 import {
   ADR_STATUSES,
   exists,
+  isGitRepo,
   listAdrs,
   listCheckScripts,
+  mergeTrace,
   parseRubric,
   readJson,
   readText,
@@ -32,10 +35,7 @@ try {
 const manifestPath = "manifest.json";
 const manifest = readJson<Record<string, unknown>>(root, manifestPath);
 const adrs = manifest["adrs"] as
-  | Record<
-      string,
-      { status: string; approved_by: string | null; assertions: string[]; criteria: string[] }
-    >
+  | Record<string, { status: string; assertions: string[]; criteria: string[] }>
   | undefined;
 if (!adrs || typeof adrs !== "object") {
   console.error("FAIL: manifest.json: missing 'adrs' map");
@@ -44,16 +44,15 @@ if (!adrs || typeof adrs !== "object") {
 
 const parsed: AdrInfo[] = listAdrs(root);
 
+// Accepted via direct commits before adr/0003 existed (bootstrap). Extend
+// only through this gated flow — additions are reviewable PR changes.
+const GRANDFATHERED_ACCEPTED = new Set(["0001-teddy-bootstrap", "0002-cockpit-minimal-scope"]);
+
 // Every check script linked from manifest.json (lib.ts excepted — shared
 // plumbing, not an assertion).
 const referenced = new Set<string>();
 for (const entry of Object.values(adrs)) {
   for (const a of strArray(entry.assertions)) referenced.add(a);
-}
-
-function approvedBy(fm: Frontmatter): string | null {
-  const v = fm["approved_by"];
-  return typeof v === "string" && v !== "" ? v : null;
 }
 
 function strArray(v: unknown): string[] {
@@ -74,13 +73,29 @@ function verify(): string[] {
     if (typeof id !== "string" || !slug.startsWith(`${id}-`)) {
       fail(`${file}: frontmatter id '${id}' does not match filename slug '${slug}'`);
     }
+    if ("approved_by" in fm) {
+      fail(`${file}: legacy field 'approved_by' — removed by adr/0003 (approval is the merge)`);
+    }
     if (typeof status !== "string" || !ADR_STATUSES.includes(status as never)) {
       fail(`${file}: invalid status '${status}' (${ADR_STATUSES.join(" | ")})`);
       continue;
     }
-    // The human gate: any transition out of 'proposed' requires an approver.
-    if (status !== "proposed" && approvedBy(fm) === null) {
-      fail(`${file}: status '${status}' requires non-null approved_by (human gate)`);
+    // The lifecycle gate (adr/0003): any transition out of 'proposed' must
+    // have landed via a true merge commit — merge = approval.
+    if (status !== "proposed") {
+      if (GRANDFATHERED_ACCEPTED.has(slug)) {
+        // accepted pre-regime via direct bootstrap commits
+      } else if (!isGitRepo(root)) {
+        fail(`${file}: cannot verify merge trace — not a git repository (adr/0003)`);
+      } else {
+        const trace = mergeTrace(root, file);
+        if (!trace) {
+          fail(
+            `${file}: status '${status}' requires a merge commit touching it ` +
+              `(merge = approval, adr/0003); squash/rebase merges defeat traceability`,
+          );
+        }
+      }
     }
     for (const ref of strArray(fm["rubric_refs"])) {
       if (!rubric.criteria[ref]) fail(`${file}: rubric_refs references unknown criterion '${ref}'`);
@@ -108,10 +123,13 @@ function verify(): string[] {
       continue;
     }
     unclaimed.delete(slug);
-    if (entry.status !== status || entry.approved_by !== approvedBy(fm)) {
+    if ("approved_by" in entry) {
+      fail(`manifest.json: legacy field 'approved_by' on '${slug}' — removed by adr/0003`);
+    }
+    if (entry.status !== status) {
       fail(
-        `manifest.json: status drift for '${slug}': manifest=${entry.status}/${entry.approved_by} ` +
-          `frontmatter=${status}/${approvedBy(fm)} — run: node checks/manifest-sync.ts . --fix`,
+        `manifest.json: status drift for '${slug}': manifest=${entry.status} ` +
+          `frontmatter=${status} — run: node checks/manifest-sync.ts . --fix`,
       );
     }
     const assertions = strArray(entry.assertions);
@@ -163,7 +181,6 @@ function applyStatusFix(): void {
     const entry = adrs![adr.slug];
     if (entry) {
       entry.status = adr.fm["status"] as string;
-      entry.approved_by = approvedBy(adr.fm);
     }
   }
   writeText(root, manifestPath, JSON.stringify(manifest, null, 2) + "\n");

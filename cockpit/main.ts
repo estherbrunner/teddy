@@ -15,14 +15,12 @@ interface Iteration {
   timestamp: string;
   overall: number;
   deterministic_gate: string;
-  approved_by: string | null;
   judge_surface: { deterministic: number; total: number };
   criteria: Record<string, CriterionScore>;
 }
 interface Adr {
   id: string;
   status: string;
-  approved_by: string | null;
   assertions: string[];
   criteria: string[];
 }
@@ -35,6 +33,7 @@ interface RubricCriterion {
 interface TeddyData {
   version: number;
   generated_by: string;
+  repository: string | null;
   rubric: { version: number; criteria: RubricCriterion[] };
   adrs: Adr[];
   iterations: Iteration[];
@@ -164,6 +163,12 @@ function render(): void {
     bigrow.appendChild(el("div", "delta flat", "first iteration — no baseline"));
   }
   bigrow.appendChild(el("span", `chip ${latest.deterministic_gate === "pass" ? "accepted" : "pending"}`, `deterministic gate: ${latest.deterministic_gate}`));
+  if (latest.status === "open" && data.repository) {
+    const review = document.createElement("a");
+    review.href = `${data.repository}/pulls`;
+    review.textContent = "review & merge ↗";
+    bigrow.appendChild(review);
+  }
   app.appendChild(bigrow);
 
   // 1 — overall trend
@@ -210,7 +215,7 @@ function render(): void {
     const s = section("Decision records", "any ADR without an approver is pending — never auto-approved");
     const table = el("table");
     const head = el("tr");
-    for (const h of ["ADR", "status", "approver", "links"]) head.appendChild(el("th", undefined, h));
+    for (const h of ["ADR", "status", "approval", "links"]) head.appendChild(el("th", undefined, h));
     const thead = document.createElement("thead");
     thead.appendChild(head);
     table.appendChild(thead);
@@ -228,10 +233,19 @@ function render(): void {
       td2.appendChild(el("span", `chip ${a.status === "accepted" ? "accepted" : dead ? "dead" : "pending"}`, a.status));
       tr.appendChild(td2);
       const td3 = el("td");
-      if (a.approved_by) {
-        td3.appendChild(el("span", "chip accepted", a.approved_by));
+      // adr/0003: approval is the merge — pending items deep-link to review.
+      if (a.status === "accepted") {
+        td3.appendChild(el("span", "chip accepted", "merged ✓"));
+        td3.title = "merge = approval (adr/0003)";
+      } else if (dead) {
+        td3.appendChild(el("span", "chip dead", "—"));
+      } else if (data.repository) {
+        const review = document.createElement("a");
+        review.href = `${data.repository}/pulls`;
+        review.textContent = "⚠ review & merge ↗";
+        td3.appendChild(review);
       } else {
-        td3.appendChild(el("span", "chip pending", "⚠ pending approval"));
+        td3.appendChild(el("span", "chip pending", "⚠ pending"));
       }
       tr.appendChild(td3);
       const td4 = el("td");

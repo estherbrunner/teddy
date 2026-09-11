@@ -7,7 +7,7 @@
 //   node checks/cockpit-report.ts --check [root]  exit 1 if data.js is stale
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { parseRubric, readJson, readText, writeText } from "./lib.ts";
+import { parseRubric, readJson, readText, repositoryUrl, writeText } from "./lib.ts";
 
 const args = process.argv.slice(2);
 const checkOnly = args.includes("--check");
@@ -16,7 +16,7 @@ const root = args.find((a) => !a.startsWith("--")) ?? process.cwd();
 const rubric = parseRubric(readText(root, "rubrics/rubric.yaml"));
 const manifest = readJson<{
   version: number;
-  adrs: Record<string, { status: string; approved_by: string | null; assertions: string[]; criteria: string[] }>;
+  adrs: Record<string, { status: string; assertions: string[]; criteria: string[] }>;
 }>(root, "manifest.json");
 const registry = readJson<{
   version: number;
@@ -36,7 +36,6 @@ const iterationsOut = registry.iterations.map((entry) => {
     criteria: Record<string, { score: number | null; judge: string; rationale: string }>;
     overall: number;
     deterministic_gate: string;
-    approved_by: string | null;
   }>(root, entry.scores);
   let total = 0;
   let deterministic = 0;
@@ -52,7 +51,6 @@ const iterationsOut = registry.iterations.map((entry) => {
     timestamp: scores.timestamp,
     overall: scores.overall,
     deterministic_gate: scores.deterministic_gate,
-    approved_by: scores.approved_by,
     judge_surface: { deterministic, total },
     criteria: scores.criteria,
   };
@@ -61,7 +59,6 @@ const iterationsOut = registry.iterations.map((entry) => {
 const adrsOut = Object.entries(manifest.adrs).map(([id, a]) => ({
   id,
   status: a.status,
-  approved_by: a.approved_by,
   assertions: a.assertions,
   criteria: a.criteria,
 }));
@@ -69,6 +66,7 @@ const adrsOut = Object.entries(manifest.adrs).map(([id, a]) => ({
 const data = {
   version: 1,
   generated_by: "checks/cockpit-report.ts",
+  repository: repositoryUrl(root),
   rubric: { version: rubric.version, criteria: criteriaOut },
   adrs: adrsOut,
   iterations: iterationsOut,

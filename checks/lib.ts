@@ -3,6 +3,43 @@
 // relative imports must carry the .ts extension.
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { spawnSync } from "node:child_process";
+
+// Is `root` a git work tree? (adr/0003 gates are git-native; a harness run
+// outside a repository cannot verify merge traceability.)
+export function isGitRepo(root: string): boolean {
+  return spawnSync("git", ["-C", root, "rev-parse", "--is-inside-work-tree"], {
+    encoding: "utf8",
+  }).status === 0;
+}
+
+// First-parent merge commits touching a path — the "which merged PR brought
+// this change" query. Plain `git log -- path` silently hides merge commits
+// whose content came from the second parent (history simplification).
+export function mergeTrace(root: string, rel: string): string | null {
+  const res = spawnSync(
+    "git",
+    ["-C", root, "log", "--first-parent", "--merges", "--format=%h %s", "--", rel],
+    { encoding: "utf8" },
+  );
+  if (res.status !== 0) return null;
+  const first = res.stdout.trim().split("\n")[0];
+  return first === "" ? null : first;
+}
+
+// `origin` remote as a browsable https URL, e.g. for cockpit deep-links.
+export function repositoryUrl(root: string): string | null {
+  const res = spawnSync("git", ["-C", root, "remote", "get-url", "origin"], {
+    encoding: "utf8",
+  });
+  if (res.status !== 0) return null;
+  let url = res.stdout.trim();
+  if (url.startsWith("git@github.com:")) {
+    url = "https://github.com/" + url.slice("git@github.com:".length);
+  }
+  if (url.endsWith(".git")) url = url.slice(0, -".git".length);
+  return url.startsWith("https://") ? url : null;
+}
 
 export interface Frontmatter {
   [key: string]: string | string[] | null;

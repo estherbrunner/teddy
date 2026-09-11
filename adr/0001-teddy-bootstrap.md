@@ -3,7 +3,6 @@ id: 0001
 status: accepted
 supersedes: null
 superseded_by: null
-approved_by: estherbrunner
 rubric_refs: [adr-traceability]
 ---
 
@@ -60,13 +59,13 @@ id: 0007
 status: proposed   # proposed | accepted | deprecated | superseded
 supersedes: null
 superseded_by: null
-approved_by: null   # required (non-null) for ANY status transition — human gate
 rubric_refs: [criterion-id, ...]
 ```
 
-Status transitions are structurally gated: the `manifest-sync` check rejects any
-ADR whose status is anything other than `proposed` while `approved_by` is null.
-No auto-merge on files under `/adr/`, ever.
+Status transitions are structurally gated: the `manifest-sync` check rejects
+any status other than `proposed` that does not trace to a true merge commit
+touching the ADR file — merge = approval (amended by adr/0003; the original
+`approved_by` field is gone). No auto-merge on files under `/adr/`, ever.
 
 ### manifest.json
 
@@ -89,8 +88,7 @@ assertions: every `checks/*.ts` except the shared `lib.ts` must be linked from
     "adr-traceability": { "score": 1, "judge": "manifest-sync", "rationale": "…" }
   },
   "overall": 0.87,
-  "deterministic_gate": "pass",
-  "approved_by": null
+  "deterministic_gate": "pass"
 }
 ```
 
@@ -98,8 +96,9 @@ assertions: every `checks/*.ts` except the shared `lib.ts` must be linked from
   weighted average (not treated as 0).
 - `overall` is precomputed and stored — the cockpit stays a static reader, no
   aggregation logic duplicated in TS.
-- `approved_by` mirrors the ADR gate: a score snapshot only becomes the new
-  baseline once a human merges the PR.
+- Closure is scribe-owned: a post-merge workflow flips the registry and
+  regenerates the cockpit data when the iteration's PR merges (amended by
+  adr/0003; the original `approved_by` field is gone).
 
 ```
 score_overall = Σ(weight_i × score_i) / Σ(weight_i)   [over non-null criteria]
@@ -126,7 +125,8 @@ ticket — score deltas stay attributable; no squash-merging multiple concerns.
 5. Gate: per-criterion non-regression (amended — see Amendment below; the
    bootstrap rule `new_overall ≥ baseline_overall` was unsound). Fails closed.
 6. PR opened with `scores.json` diff attached.
-7. Human merges → `approved_by` set → cockpit ingests → new baseline.
+7. Human merges — the merge is the approval → scribe closes the iteration and
+   refreshes the cockpit → new baseline.
 8. Repeated judge/human disagreement on a criterion → ADR amendment or
    promotion of that criterion to a deterministic assertion.
 

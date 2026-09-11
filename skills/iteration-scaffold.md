@@ -37,14 +37,17 @@ Body: scope, out-of-scope, affected criteria.
   "timestamp": "<UTC now, ISO-8601>",
   "criteria": { "...": { "score": null, "judge": "…", "rationale": "not yet exercised" } },
   "overall": 0,
-  "deterministic_gate": "pass",
-  "approved_by": null
+  "deterministic_gate": "pass"
 }
 ```
 
 4. Register the iteration in `manifest-of-iterations.json` (`status: open`,
    `baseline` = previous closed-or-open iteration id; `null` only for the first).
 5. `git checkout -b iteration/NNNN-slug`.
+
+Closure is not your concern: when the iteration's PR is merged, the scribe
+workflow flips the registry to `closed` and regenerates the cockpit
+(adr/0003). You never write closure state by hand.
 
 ## The scaffolded branch is red — on purpose
 
@@ -58,6 +61,8 @@ an iteration with no evidence cannot pass. Deterministic gates
 - Copy the baseline's *scores* — only its *structure*. Carried-over scores fake stability.
 - Put two concerns in one iteration because "they're small".
 - Set `baseline: null` on a non-first iteration to dodge the gate.
+- Pre-close the registry entry or write anything resembling an approval —
+  closure belongs to the scribe at merge time (adr/0003).
 
 ## Red flags — stop
 
