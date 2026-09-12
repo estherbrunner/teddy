@@ -34,8 +34,8 @@ Note the disagreement in the iteration's PR so it becomes trackable.
 
 ## Never
 
-- Merge a PR, or edit registry closure state — the scribe owns it at merge
-  time (adr/0003); agents never merge.
+- Merge a PR — the merge *is* approval and closure (adr/0003, adr/0005);
+  agents never merge.
 - Transition ADR status as a side effect of scoring.
 - Score a criterion you cannot cite evidence for; leave it null instead.
 - Round a weak result up "because the trend is right" — report the number.

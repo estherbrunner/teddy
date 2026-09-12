@@ -1,5 +1,6 @@
 node_modules/
 cockpit/main.js
+cockpit/data.js
 .playwright-mcp/
 *.log
 .DS_Store

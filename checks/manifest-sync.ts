@@ -42,6 +42,7 @@ if (!adrs || typeof adrs !== "object") {
 }
 
 const parsed: AdrInfo[] = listAdrs(root);
+const pendingMergeContext = process.env.GITHUB_EVENT_NAME === "pull_request";
 
 // Accepted via direct commits before adr/0003 existed (bootstrap). Extend
 // only through this gated flow — additions are reviewable PR changes.
@@ -80,7 +81,9 @@ function verify(): string[] {
       continue;
     }
     // The lifecycle gate (adr/0003): any transition out of 'proposed' must
-    // have landed via a true merge commit — merge = approval.
+    // have landed via a true merge commit — merge = approval. On a pull
+    // request the branch carries the target status and the merge realizes
+    // it, so the trace is pending there and reconciled on main (adr/0005).
     if (status !== "proposed") {
       if (GRANDFATHERED_ACCEPTED.has(slug)) {
         // accepted pre-regime via direct bootstrap commits
@@ -88,7 +91,9 @@ function verify(): string[] {
         fail(`${file}: cannot verify merge trace — not a git repository (adr/0003)`);
       } else {
         const trace = mergeTrace(root, file);
-        if (!trace) {
+        if (!trace && pendingMergeContext) {
+          console.log(`manifest-sync: ${file} '${status}' pending merge — trace reconciled on main`);
+        } else if (!trace) {
           fail(
             `${file}: status '${status}' requires a merge commit touching it ` +
               `(merge = approval, adr/0003); squash/rebase merges defeat traceability`,

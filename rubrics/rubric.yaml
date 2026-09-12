@@ -21,3 +21,5 @@ adrs:
     criteria: [adr-traceability]
   0004-lint-gate:
     criteria: []
+  0005-derived-state-is-never-stored:
+    criteria: [adr-traceability]

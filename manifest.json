@@ -26,8 +26,7 @@
       "status": "accepted",
       "assertions": [
         "checks/manifest-sync.ts",
-        "checks/scores-check.ts",
-        "checks/scribe.ts"
+        "checks/scores-check.ts"
       ],
       "criteria": [
         "adr-traceability"
@@ -39,6 +38,17 @@
         "checks/lint.ts"
       ],
       "criteria": []
+    },
+    "0005-derived-state-is-never-stored": {
+      "status": "accepted",
+      "assertions": [
+        "checks/cockpit-report.ts",
+        "checks/scores-check.ts",
+        "checks/selftest.ts"
+      ],
+      "criteria": [
+        "adr-traceability"
+      ]
     }
   }
 }

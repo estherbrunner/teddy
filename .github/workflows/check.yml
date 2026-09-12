@@ -1,5 +1,8 @@
 name: check
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 jobs:
   check:
@@ -8,13 +11,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           # full history: the gates reconcile ADR/iteration state against
-          # merge commits (adr/0003)
+          # merge commits (adr/0003); iteration closure is derived from them
+          # (adr/0005)
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 26
       - run: npm ci
       # Deterministic hard gate: selftest (the checks themselves), traceability,
-      # scores/baseline gate, data.js freshness — then typecheck and build.
+      # scores/baseline gate, cockpit data generation — then typecheck and build.
       - run: npm test
       - run: npm run build

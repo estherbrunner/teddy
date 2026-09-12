@@ -1,10 +1,11 @@
 // Selftest: verifies that Teddy's deterministic checks fail on broken trees
 // and pass on valid ones. Runs each check as a subprocess against throwaway
 // fixture trees — real git repositories, since merge traceability is part of
-// the gates (adr/0003: merge = approval).
+// the gates (adr/0003: merge = approval) and iteration closure is derived
+// from it (adr/0005).
 // Usage: node checks/selftest.ts
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -101,8 +102,7 @@ const MANIFEST_OF_ITERATIONS = `{
       "id": "0001-fixture",
       "ticket": "iterations/0001-fixture/ticket.md",
       "scores": "iterations/0001-fixture/scores.json",
-      "baseline": null,
-      "status": "open"
+      "baseline": null
     }
   ]
 }
@@ -199,7 +199,6 @@ function addIteration0002(root: string, scores: string): void {
     ticket: "iterations/0002-fixture/ticket.md",
     scores: "iterations/0002-fixture/scores.json",
     baseline: "0001-fixture",
-    status: "open",
   });
   write(root, "manifest-of-iterations.json", `${JSON.stringify(entries, null, 2)}\n`);
 }
@@ -220,11 +219,21 @@ function acceptViaMerge(root: string, withManifest = true): void {
   gitc(root, "merge", "-q", "--no-ff", "feat", "-m", "Merge pull request #9 from t/feat");
 }
 
-function setRegistryStatus(root: string, id: string, status: string): void {
-  const entries = JSON.parse(readText(root, "manifest-of-iterations.json"));
-  const it = entries.iterations.find((e: { id: string }) => e.id === id);
-  it.status = status;
-  write(root, "manifest-of-iterations.json", `${JSON.stringify(entries, null, 2)}\n`);
+// Land the iteration directory via a true merge commit — the only closure
+// path: closed is derived from exactly this trace (adr/0005).
+function mergeIteration(root: string, id: string, branch: string, prNo: number): void {
+  gitc(root, "checkout", "-qb", branch);
+  write(root, `iterations/${id}/scores.json`, `${readText(root, `iterations/${id}/scores.json`)}\n`);
+  gitc(root, "add", "-A");
+  gitc(root, "commit", "-qm", `close ${id}`);
+  gitc(root, "checkout", "-q", "main");
+  gitc(root, "merge", "-q", "--no-ff", branch, "-m", `Merge pull request #${prNo} from t/${branch}`);
+}
+
+function dataStatus(root: string, id: string): string | undefined {
+  const js = readText(root, "cockpit/data.js");
+  const data = JSON.parse(js.slice(js.indexOf("=") + 1).trim().replace(/;$/, ""));
+  return data.iterations.find((i: { id: string }) => i.id === id)?.status;
 }
 
 // adr/0004 fixtures: a package.json declaring linters and fake local .bin
@@ -261,12 +270,20 @@ try {
     roots.push(root);
     const ms = run(root, "manifest-sync.ts");
     const sc = run(root, "scores-check.ts");
-    const rep = run(root, "cockpit-report.ts");
     const repCheck = run(root, "cockpit-report.ts", "--check");
     expect("valid tree: manifest-sync passes", ms.ok, ms.output);
     expect("valid tree: scores-check passes", sc.ok, sc.output);
-    expect("valid tree: cockpit-report writes data.js", rep.ok, rep.output);
-    expect("valid tree: cockpit-report --check passes", repCheck.ok, repCheck.output);
+    expect(
+      "valid tree: cockpit-report --check passes without writing",
+      repCheck.ok && !existsSync(join(root, "cockpit/data.js")),
+      repCheck.output,
+    );
+    const rep = run(root, "cockpit-report.ts");
+    expect(
+      "valid tree: cockpit-report derives 'open' for an unmerged iteration",
+      rep.ok && dataStatus(root, "0001-fixture") === "open",
+      rep.output,
+    );
   }
 
   // B' — accepted ADR landed as a direct commit: no merge, no approval.
@@ -357,22 +374,18 @@ try {
     );
   }
 
-  // G — stale data.js: scores changed after data.js was generated.
+  // G — data.js is a build output (adr/0005): a hand-edited or stale copy is
+  // simply overwritten by generation; --check never consults it.
   {
     const root = makeTree();
     roots.push(root);
+    write(root, "cockpit/data.js", "window.__TEDDY_DATA__ = { stale: true };\n");
+    const check = run(root, "cockpit-report.ts", "--check");
     const rep = run(root, "cockpit-report.ts");
-    expect("fixture: cockpit-report runs", rep.ok, rep.output);
-    write(
-      root,
-      "iterations/0001-fixture/scores.json",
-      SCORES.replace("not exercised", "not exercised yet"),
-    );
-    const stale = run(root, "cockpit-report.ts", "--check");
     expect(
-      "stale data.js is rejected by --check",
-      !stale.ok && stale.output.includes("stale"),
-      stale.output,
+      "stale data.js is ignored by --check and overwritten by generation",
+      check.ok && rep.ok && !readText(root, "cockpit/data.js").includes("stale"),
+      `${check.output}${rep.output}`,
     );
   }
 
@@ -397,46 +410,71 @@ try {
     expect("manifest-sync passes after --fix", second.ok, second.output);
   }
 
-  // J1 — registry 'closed' without a merge touching the iteration directory.
+  // J1 — legacy 'status' in the registry: closure is derived, never stored.
   {
     const root = makeTree();
     roots.push(root);
-    setRegistryStatus(root, "0001-fixture", "closed");
+    const entries = JSON.parse(readText(root, "manifest-of-iterations.json"));
+    entries.iterations[0].status = "closed";
+    write(root, "manifest-of-iterations.json", `${JSON.stringify(entries, null, 2)}\n`);
     const sc = run(root, "scores-check.ts");
     expect(
-      "closed iteration without merge trace is rejected",
-      !sc.ok && sc.output.includes("merge commit"),
+      "legacy registry status field is rejected",
+      !sc.ok && sc.output.includes("legacy field 'status'"),
       sc.output,
     );
   }
 
-  // J2 — closed via a true merge commit: must pass.
+  // J2 — merged via a true merge commit: derived status flips to closed with
+  // no field written anywhere.
   {
     const root = makeTree();
     roots.push(root);
-    gitc(root, "checkout", "-qb", "feat");
-    write(
-      root,
-      "iterations/0001-fixture/scores.json",
-      SCORES.replace("not exercised", "not exercised yet"),
-    );
-    setRegistryStatus(root, "0001-fixture", "closed");
-    gitc(root, "add", "-A");
-    gitc(root, "commit", "-qm", "close 0001");
-    gitc(root, "checkout", "-q", "main");
-    gitc(root, "merge", "-q", "--no-ff", "feat", "-m", "Merge pull request #10 from t/close");
+    mergeIteration(root, "0001-fixture", "close-1", 10);
     const sc = run(root, "scores-check.ts");
-    expect("closed iteration with merge trace passes", sc.ok, sc.output);
+    const rep = run(root, "cockpit-report.ts");
+    expect("merged iteration passes scores-check", sc.ok, sc.output);
+    expect(
+      "merged iteration is derived as 'closed' in data.js",
+      rep.ok && dataStatus(root, "0001-fixture") === "closed",
+      rep.output,
+    );
   }
 
-  // J3 — closed on a PR branch: the carrying merge does not exist yet, so the
-  // trace reconciliation defers to main (github events only; local stays strict).
+  // J3 — out-of-order: the second iteration merges while its baseline never
+  // did (direct commit) — the baseline chain must reject it.
   {
     const root = makeTree();
     roots.push(root);
-    setRegistryStatus(root, "0001-fixture", "closed");
-    const sc = runEnv(root, { GITHUB_EVENT_NAME: "pull_request" }, "scores-check.ts");
-    expect("closed iteration on a PR branch defers trace to main", sc.ok, sc.output);
+    addIteration0002(root, SCORES_0002);
+    gitc(root, "add", "-A");
+    gitc(root, "commit", "-qm", "scaffold 0002");
+    mergeIteration(root, "0002-fixture", "close-2", 11);
+    const sc = run(root, "scores-check.ts");
+    expect(
+      "iteration merged before its baseline is rejected",
+      !sc.ok && sc.output.includes("out-of-order"),
+      sc.output,
+    );
+  }
+
+  // J4 — accepted ADR on a pull-request run: the branch carries the status,
+  // the merge realizes it — trace is pending there, reconciled on main.
+  {
+    const root = makeTree();
+    roots.push(root);
+    write(root, "adr/0001-fixture.md", ADR_ACCEPTED);
+    const m = JSON.parse(readText(root, "manifest.json"));
+    m.adrs["0001-fixture"].status = "accepted";
+    write(root, "manifest.json", `${JSON.stringify(m, null, 2)}\n`);
+    gitc(root, "add", "-A");
+    gitc(root, "commit", "-qm", "accept on branch");
+    const ms = runEnv(root, { GITHUB_EVENT_NAME: "pull_request" }, "manifest-sync.ts");
+    expect(
+      "accepted ADR on a PR branch defers trace to main",
+      ms.ok && ms.output.includes("pending merge"),
+      ms.output,
+    );
   }
 
   // K — legacy field guards: reintroducing approved_by anywhere fails.

@@ -28,7 +28,8 @@ criteria) are always hand-maintained.
 - Manifest criteria ≡ `rubrics/rubric.yaml` `adrs:` section per ADR — no drift.
 - Any status other than `proposed` must trace to a true merge commit touching
   the ADR file (merge = approval, adr/0003). Direct, squash, and rebase merges
-  don't count.
+  don't count. On `pull_request` CI runs a missing trace is reported as
+  *pending merge* and passes — the merge realizes it (adr/0005).
 - The legacy `approved_by` field is rejected wherever it reappears.
 
 ## After changing the rubric or manifest

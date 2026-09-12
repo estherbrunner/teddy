@@ -8,7 +8,7 @@ import { existsSync, readdirSync } from "node:fs";
 import {
   exists,
   isGitRepo,
-  mergeTrace,
+  iterationStatus,
   parseFrontmatter,
   parseRubric,
   readJson,
@@ -35,7 +35,6 @@ interface IterationEntry {
   ticket: string;
   scores: string;
   baseline: string | null;
-  status: string;
 }
 
 interface ScoreEntry {
@@ -69,8 +68,11 @@ for (const e of registry.iterations) {
   }
   if (!exists(root, e.ticket)) fail(`manifest-of-iterations.json: '${e.id}' ticket missing: ${e.ticket}`);
   if (!exists(root, e.scores)) fail(`manifest-of-iterations.json: '${e.id}' scores missing: ${e.scores}`);
-  if (e.status !== "open" && e.status !== "closed") {
-    fail(`manifest-of-iterations.json: '${e.id}' invalid status '${e.status}' (open | closed)`);
+  if ("status" in e) {
+    fail(
+      `manifest-of-iterations.json: '${e.id}' legacy field 'status' — removed by adr/0005 ` +
+        `(closure is derived from merge history, never stored)`,
+    );
   }
 }
 
@@ -209,34 +211,22 @@ for (const entry of registry.iterations) {
   }
 }
 
-// Closure gates (adr/0003): 'closed' is scribe-owned — it must trace to a
-// true merge commit touching the iteration directory (merge = approval), and
-// the baseline chain must close in order. On pull-request runs the carrying
-// merge does not exist yet (the scribe writes closure to the branch and the
-// merge carries it), so trace reconciliation defers to main.
-const pendingMergeContext = process.env.GITHUB_EVENT_NAME === "pull_request";
-for (const entry of registry.iterations) {
-  if (entry.status !== "closed") continue;
-  if (entry.baseline !== null) {
-    const baseEntry = byId.get(entry.baseline);
-    if (baseEntry && baseEntry.status !== "closed") {
-      fail(`${entry.scores}: closed while baseline '${entry.baseline}' is still open`);
+// Closure order (adr/0003, adr/0005): closure is derived — an iteration is
+// closed iff a merge commit touches its directory — so there is nothing to
+// reconcile, only order to enforce: a closed iteration whose baseline is
+// still open means an out-of-order or squash/rebase merge, which defeats
+// the baseline chain.
+if (!isGitRepo(root)) {
+  fail("cannot derive iteration closure — not a git repository (adr/0003, adr/0005)");
+} else {
+  for (const entry of registry.iterations) {
+    if (entry.baseline === null || !byId.has(entry.baseline)) continue;
+    if (iterationStatus(root, entry.id) === "closed" && iterationStatus(root, entry.baseline) === "open") {
+      fail(
+        `${entry.scores}: closed (merged) while baseline '${entry.baseline}' is still open — ` +
+          `out-of-order merge, or the baseline's PR was squash/rebase-merged (adr/0003)`,
+      );
     }
-  }
-  if (!isGitRepo(root)) {
-    fail(`${entry.scores}: cannot verify merge trace — not a git repository (adr/0003)`);
-    continue;
-  }
-  const trace = mergeTrace(root, `iterations/${entry.id}`);
-  if (!trace && pendingMergeContext) {
-    console.log(`scores-check: '${entry.id}' closed pending merge — trace reconciled on main`);
-    continue;
-  }
-  if (!trace) {
-    fail(
-      `${entry.scores}: registry 'closed' but no merge commit touches iterations/${entry.id} ` +
-        `(merge = approval, adr/0003); squash/rebase merges defeat traceability`,
-    );
   }
 }
 
