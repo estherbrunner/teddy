@@ -1,7 +1,4 @@
 {
-  "iteration": "0006-derived-state",
-  "ticket": "0006",
-  "baseline": "0005-lint-gate",
   "timestamp": "2026-09-12T10:30:00Z",
   "criteria": {
     "adr-traceability": {
@@ -30,7 +27,5 @@
       "gates": {},
       "signals": {}
     }
-  },
-  "overall": 1,
-  "deterministic_gate": "pass"
+  }
 }

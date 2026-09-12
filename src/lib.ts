@@ -1,10 +1,138 @@
-// Shared parsing + aggregation helpers for Teddy's deterministic checks.
-// Runs under Node's native type-stripping: erasable syntax only, ESM,
-// relative imports must carry the .ts extension.
-import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { pathToFileURL } from "node:url";
+// Teddy's library: configuration, rubric types, derived iteration model,
+// git helpers, and the check runner. Runs from source under Node's native
+// type stripping (erasable syntax only, ESM, .ts import specifiers) and
+// from dist/ after tsc (adr/0007). Hosts import only types from here.
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, statSync } from "node:fs";
+import { join, dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
+
+// ---------------------------------------------------------------------------
+// Configuration (adr/0007): zero-config defaults, overridable by an optional
+// teddy.config.ts that may import nothing but the Config type.
+
+export interface Config {
+  dirs?: { adr?: string; iterations?: string; checks?: string };
+  pattern?: RegExp; // directory naming for ADRs and iterations
+  main?: string; // trunk branch
+  src?: string[]; // code under judgment (judge diff, coverage paths)
+  rubric?: Rubric;
+}
+
+export interface ResolvedConfig {
+  dirs: { adr: string; iterations: string; checks: string };
+  pattern: RegExp;
+  main: string;
+  src: string[];
+  rubric: LoadedRubric;
+}
+
+export const CONFIG_PATH = "teddy.config.ts";
+
+// Where the built-in checks live: src/checks/*.ts from source, dist/checks/*.js
+// after build — resolved from this module's own location.
+const here = dirname(fileURLToPath(import.meta.url));
+export const BUILTIN_EXT = import.meta.url.endsWith(".js") ? ".js" : ".ts";
+export const BUILTIN_CHECKS_DIR = join(here, "checks");
+export const PACKAGE_ROOT = resolve(here, "..");
+
+export function listBuiltinChecks(): string[] {
+  return readdirSync(BUILTIN_CHECKS_DIR)
+    .filter((f) => f.endsWith(BUILTIN_EXT))
+    .map((f) => f.slice(0, -BUILTIN_EXT.length))
+    .sort();
+}
+
+// Minimal traceability rubric for hosts that configure nothing. The
+// host-project criteria (correctness, security, …) follow their adapters.
+export const DEFAULT_RUBRIC: Rubric = {
+  version: 2,
+  tolerance: 0.1,
+  criteria: [
+    {
+      id: "traceability",
+      description: "Every accepted ADR has ≥1 linked assertion or rubric criterion; no orphaned checks",
+      weight: 1,
+      gates: ["manifest-sync"],
+      signals: [],
+      judge: "none",
+    },
+    {
+      id: "hygiene",
+      description: "The tree type-checks and lints clean with the tools the project declares",
+      weight: 1,
+      gates: ["typecheck", "lint"],
+      signals: [],
+      judge: "none",
+    },
+    {
+      id: "correctness",
+      description: "The declared test suite passes",
+      weight: 2,
+      gates: ["test"],
+      signals: [],
+      judge: "none",
+    },
+  ],
+};
+
+export async function loadConfig(root: string): Promise<ResolvedConfig> {
+  const file = join(root, CONFIG_PATH);
+  let cfg: Config = {};
+  if (existsSync(file)) {
+    const violations = configImportViolations(readFileSync(file, "utf8"), CONFIG_PATH);
+    if (violations.length > 0) throw new CheckError(violations.join("\n"));
+    const mod = (await import(pathToFileURL(file).href)) as { default?: unknown };
+    cfg = validateConfig(mod.default);
+  }
+  const rubric = validateRubric(cfg.rubric ?? DEFAULT_RUBRIC);
+  const byId: Record<string, RubricCriterion> = {};
+  for (const c of rubric.criteria) byId[c.id] = c;
+  return {
+    dirs: { adr: cfg.dirs?.adr ?? "adr", iterations: cfg.dirs?.iterations ?? "iterations", checks: cfg.dirs?.checks ?? "checks" },
+    pattern: cfg.pattern ?? /^\d{4}-[a-z0-9-]+$/,
+    main: cfg.main ?? "main",
+    src: cfg.src ?? ["src/**"],
+    rubric: { ...rubric, tolerance: rubric.tolerance ?? 0.1, byId },
+  };
+}
+
+// Configuration is data: only type-only imports (erased at runtime) are
+// allowed, whatever they point at.
+export function configImportViolations(text: string, file: string): string[] {
+  const out: string[] = [];
+  for (const [i, line] of text.split("\n").entries()) {
+    if (!/^\s*(import|export\s+.*\s+from)\b/.test(line)) continue;
+    if (/^\s*import\s+type\s+\{[^}]*\}\s+from\s+["'][^"']+["'];?\s*$/.test(line)) continue;
+    out.push(`${file}:${i + 1}: only 'import type { … } from "…"' is allowed — configuration is data`);
+  }
+  return out;
+}
+
+export function validateConfig(v: unknown): Config {
+  const bad = (msg: string): never => {
+    throw new CheckError(`${CONFIG_PATH}: ${msg}`);
+  };
+  if (!v || typeof v !== "object") bad("default export must be a Config object");
+  const c = v as Record<string, unknown>;
+  for (const k of Object.keys(c)) {
+    if (!["dirs", "pattern", "main", "src", "rubric"].includes(k)) bad(`unknown key '${k}'`);
+  }
+  if (c.dirs !== undefined) {
+    if (typeof c.dirs !== "object" || c.dirs === null) bad("dirs must be an object");
+    for (const [k, d] of Object.entries(c.dirs as Record<string, unknown>)) {
+      if (!["adr", "iterations", "checks"].includes(k)) bad(`dirs: unknown key '${k}'`);
+      if (typeof d !== "string" || d === "" || d.startsWith("/") || d.includes("..")) bad(`dirs.${k} must be a relative directory`);
+    }
+  }
+  if (c.pattern !== undefined && !(c.pattern instanceof RegExp)) bad("pattern must be a RegExp");
+  if (c.main !== undefined && (typeof c.main !== "string" || c.main === "")) bad("main must be a branch name");
+  if (c.src !== undefined && (!Array.isArray(c.src) || c.src.some((g) => typeof g !== "string"))) bad("src must be string[]");
+  return c as Config;
+}
+
+// ---------------------------------------------------------------------------
+// Git
 
 // Is `root` a git work tree? (adr/0003 gates are git-native; a harness run
 // outside a repository cannot verify merge traceability.)
@@ -44,8 +172,82 @@ export function mergedPr(root: string, rel: string): number | null {
 // closed iff a first-parent merge commit touches its directory on the
 // current ref — i.e. its PR was merged (merge = approval, adr/0003).
 export type IterationStatus = "open" | "closed";
-export function iterationStatus(root: string, id: string): IterationStatus {
-  return mergeTrace(root, `iterations/${id}`) ? "closed" : "open";
+
+// The trunk, wherever this checkout has it (CI checkouts of a PR carry
+// origin/main but no local main).
+export function trunkRef(root: string, main: string): string | null {
+  for (const ref of [main, `origin/${main}`]) {
+    if (spawnSync("git", ["-C", root, "rev-parse", "--verify", "-q", ref], { encoding: "utf8" }).status === 0) return ref;
+  }
+  return null;
+}
+
+// Does `rel` exist in the tree at `ref`?
+export function existsAt(root: string, ref: string, rel: string): boolean {
+  return spawnSync("git", ["-C", root, "cat-file", "-e", `${ref}:${rel}`], { encoding: "utf8" }).status === 0;
+}
+
+// ---------------------------------------------------------------------------
+// Iterations (adr/0007): derived, never stored. An iteration is a directory
+// under dirs.iterations matching the pattern; it is closed iff a first-parent
+// merge commit touches it (adr/0005); its baseline is the previous iteration
+// in trunk merge order — closed ones by (merge order, number), then open ones
+// by number. On a PR branch the closed set is the trunk history up to the
+// merge base, so concurrent PRs each see the right baseline.
+
+export interface Iteration {
+  id: string;
+  dir: string; // relative, e.g. iterations/0001-slug
+  ticket: string; // relative path to ticket.md
+  scores: string; // relative path to scores.json
+  status: IterationStatus;
+  pr: number | null;
+  baseline: string | null;
+  onTrunk: boolean; // directory exists at the merge base with the trunk
+}
+
+export function listIterations(root: string, cfg: ResolvedConfig): Iteration[] {
+  const dir = join(root, cfg.dirs.iterations);
+  if (!existsSync(dir)) return [];
+  const names = readdirSync(dir)
+    .filter((d) => !d.startsWith(".") && statSync(join(dir, d)).isDirectory())
+    .sort();
+  // First-parent merge order on this ref: index 0 = newest.
+  const merges = spawnSync("git", ["-C", root, "log", "--first-parent", "--merges", "--format=%h"], { encoding: "utf8" })
+    .stdout.trim().split("\n").filter(Boolean);
+  const order = new Map(merges.map((h, i) => [h, merges.length - i])); // older = smaller
+  const trunk = trunkRef(root, cfg.main);
+  const base = trunk
+    ? spawnSync("git", ["-C", root, "merge-base", trunk, "HEAD"], { encoding: "utf8" }).stdout.trim()
+    : "";
+  const items = names.map((id) => {
+    const rel = `${cfg.dirs.iterations}/${id}`;
+    const trace = mergeTrace(root, rel, true);
+    const hash = trace?.split(" ")[0] ?? "";
+    return {
+      id,
+      rel,
+      mergeIndex: trace ? (order.get(hash) ?? 0) : Number.POSITIVE_INFINITY,
+      pr: trace ? mergedPr(root, rel) : null,
+      onTrunk: base !== "" && existsAt(root, base, rel),
+    };
+  });
+  items.sort((a, b) => (a.mergeIndex - b.mergeIndex) || a.id.localeCompare(b.id));
+  let prev: string | null = null;
+  return items.map((it) => {
+    const out: Iteration = {
+      id: it.id,
+      dir: it.rel,
+      ticket: `${it.rel}/ticket.md`,
+      scores: `${it.rel}/scores.json`,
+      status: Number.isFinite(it.mergeIndex) ? "closed" : "open",
+      pr: it.pr,
+      baseline: prev,
+      onTrunk: it.onTrunk,
+    };
+    prev = it.id;
+    return out;
+  });
 }
 
 // `origin` remote as a browsable https URL, e.g. for cockpit deep-links.
@@ -95,52 +297,26 @@ export interface RubricCriterion {
 
 export interface Rubric {
   version: 2;
-  tolerance: number; // max drop of an llm score vs its last recorded value
+  tolerance?: number; // max drop of an llm score vs its last recorded value (default 0.1)
   criteria: RubricCriterion[];
-  adrs: Record<string, string[]>; // ADR slug → criterion ids (mirrors manifest.json)
 }
 
 // Loaded, validated, and indexed for the checks.
 export interface LoadedRubric extends Rubric {
+  tolerance: number;
   byId: Record<string, RubricCriterion>;
 }
 
-export const RUBRIC_PATH = "rubrics/rubric.ts";
-
-// The rubric is code (adr/0006): it may import only its own type. Any other
-// import — anything that could execute — fails the traceability gate.
-export function rubricImportViolations(text: string): string[] {
-  const out: string[] = [];
-  for (const [i, line] of text.split("\n").entries()) {
-    if (!/^\s*(import|export\s+.*\s+from)\b/.test(line)) continue;
-    if (/^\s*import\s+type\s+\{[^}]*\}\s+from\s+["']\.\.\/checks\/lib\.ts["'];?\s*$/.test(line)) continue;
-    out.push(`${RUBRIC_PATH}:${i + 1}: only 'import type { … } from "../checks/lib.ts"' is allowed`);
-  }
-  return out;
-}
-
-export async function loadRubric(root: string): Promise<LoadedRubric> {
-  const file = join(root, RUBRIC_PATH);
-  if (!existsSync(file)) throw new CheckError(`${RUBRIC_PATH}: missing`);
-  const violations = rubricImportViolations(readFileSync(file, "utf8"));
-  if (violations.length > 0) throw new CheckError(violations.join("\n"));
-  const mod = (await import(pathToFileURL(file).href)) as { default?: unknown; rubric?: unknown };
-  const rubric = validateRubric(mod.default ?? mod.rubric);
-  const byId: Record<string, RubricCriterion> = {};
-  for (const c of rubric.criteria) byId[c.id] = c;
-  return { ...rubric, byId };
-}
-
-// Runtime shape check — tsc validates Teddy's own rubric, but a host's
-// rubric (or a fixture's) reaches the checks untyped.
+// Runtime shape check — tsc validates a typed config, but a host's rubric
+// (or a fixture's) reaches the checks untyped.
 export function validateRubric(v: unknown): Rubric {
   const bad = (msg: string): never => {
-    throw new CheckError(`${RUBRIC_PATH}: ${msg}`);
+    throw new CheckError(`${CONFIG_PATH}: rubric: ${msg}`);
   };
   if (!v || typeof v !== "object") bad("default export must be a Rubric object");
   const r = v as Record<string, unknown>;
   if (r.version !== 2) bad(`version must be 2 (got ${String(r.version)})`);
-  const tolerance = r.tolerance ?? 0.1;
+  const tolerance = r.tolerance === undefined ? 0.1 : r.tolerance;
   if (typeof tolerance !== "number" || tolerance < 0 || tolerance > 1) bad("tolerance must be a number in [0, 1]");
   if (!Array.isArray(r.criteria) || r.criteria.length === 0) bad("criteria must be a non-empty array");
   const seen = new Set<string>();
@@ -166,13 +342,8 @@ export function validateRubric(v: unknown): Rubric {
       }
     }
   }
-  if (!r.adrs || typeof r.adrs !== "object") bad("adrs must be an object");
-  for (const [slug, ids] of Object.entries(r.adrs as Record<string, unknown>)) {
-    if (!Array.isArray(ids) || ids.some((x) => typeof x !== "string" || !seen.has(x))) {
-      bad(`adrs['${slug}'] must list known criterion ids`);
-    }
-  }
-  return { ...(r as unknown as Rubric), tolerance };
+  if ("adrs" in r) bad("legacy 'adrs' map — ADR ↔ criterion links live in ADR frontmatter rubric_refs (adr/0007)");
+  return { ...(r as unknown as Rubric), tolerance: tolerance as number };
 }
 
 // Check contract (adr/0006): `node checks/<id>.ts --json [root]` prints one
@@ -185,9 +356,27 @@ export interface CheckResult {
   signals: Record<string, number>;
 }
 
-export function runCheck(root: string, id: string): CheckResult {
-  const script = join(root, "checks", `${id}.ts`);
-  if (!existsSync(script)) return { id, verdict: "fail", signals: {} };
+// A check id resolves to the host's checks/<id>.ts first, then to a
+// built-in (adr/0007). Null when neither exists.
+export function resolveCheck(root: string, cfg: ResolvedConfig, id: string): string | null {
+  const host = join(root, cfg.dirs.checks, `${id}.ts`);
+  if (existsSync(host)) return host;
+  const builtin = join(BUILTIN_CHECKS_DIR, `${id}${BUILTIN_EXT}`);
+  return existsSync(builtin) ? builtin : null;
+}
+
+// `teddy:<id>` assertions may name a built-in check or command.
+export function resolveBuiltin(id: string): string | null {
+  for (const dir of [BUILTIN_CHECKS_DIR, join(here, "commands")]) {
+    const f = join(dir, `${id}${BUILTIN_EXT}`);
+    if (existsSync(f)) return f;
+  }
+  return null;
+}
+
+export function runCheck(root: string, cfg: ResolvedConfig, id: string): CheckResult {
+  const script = resolveCheck(root, cfg, id);
+  if (!script) return { id, verdict: "fail", signals: {} };
   const res = spawnSync(process.execPath, [script, "--json", root], {
     encoding: "utf8",
     env: { ...process.env, GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME ?? "push" },
@@ -314,31 +503,49 @@ export function parseFrontmatter(text: string, file: string): ParsedFile {
 
 export const ADR_STATUSES = ["proposed", "accepted", "deprecated", "superseded"] as const;
 
+// ADR frontmatter is the single source for status, rubric_refs, and
+// assertions (adr/0007): `checks/x.ts` (host) or `teddy:<id>` (built-in).
 export interface AdrInfo {
   file: string; // e.g. "adr/0001-teddy-bootstrap.md"
   slug: string; // e.g. "0001-teddy-bootstrap"
   fm: Frontmatter;
+  status: string;
+  rubricRefs: string[];
+  assertions: string[];
 }
 
-export function listAdrs(root: string): AdrInfo[] {
-  const dir = join(root, "adr");
+function strList(v: unknown): string[] {
+  return Array.isArray(v) ? (v as string[]) : [];
+}
+
+export function listAdrs(root: string, cfg: ResolvedConfig): AdrInfo[] {
+  const dir = join(root, cfg.dirs.adr);
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((f) => f.endsWith(".md"))
     .sort()
     .map((f) => {
-      const rel = `adr/${f}`;
+      const rel = `${cfg.dirs.adr}/${f}`;
       const { fm } = parseFrontmatter(readText(root, rel), rel);
-      return { file: rel, slug: f.replace(/\.md$/, ""), fm };
+      return {
+        file: rel,
+        slug: f.replace(/\.md$/, ""),
+        fm,
+        status: String(fm.status),
+        rubricRefs: strList(fm.rubric_refs),
+        assertions: strList(fm.assertions),
+      };
     });
 }
 
-export function listCheckScripts(root: string): string[] {
-  const dir = join(root, "checks");
+// Host check scripts (every one must be linked from ≥1 ADR — orphan rule).
+export function listHostChecks(root: string, cfg: ResolvedConfig): string[] {
+  const dir = join(root, cfg.dirs.checks);
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
-    .filter((f) => f.endsWith(".ts"))
-    .sort();
+    .filter((f) => f.endsWith(".ts") && f !== "lib.ts")
+    .sort()
+    .map((f) => `${cfg.dirs.checks}/${f}`);
 }
 
 // Σ(weight_i × score_i) / Σ(weight_i) over non-null criteria; null when

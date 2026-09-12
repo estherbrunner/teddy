@@ -1,7 +1,4 @@
 {
-  "iteration": "0001-teddy-bootstrap",
-  "ticket": "0001",
-  "baseline": null,
   "timestamp": "2026-09-11T09:00:00Z",
   "criteria": {
     "adr-traceability": {
@@ -30,7 +27,5 @@
       "gates": {},
       "signals": {}
     }
-  },
-  "overall": 1,
-  "deterministic_gate": "pass"
+  }
 }

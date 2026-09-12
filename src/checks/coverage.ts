@@ -10,7 +10,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { emitResult } from "./lib.ts";
+import { emitResult } from "../lib.ts";
 
 const args = process.argv.slice(2);
 const json = args.includes("--json");

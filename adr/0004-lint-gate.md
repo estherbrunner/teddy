@@ -3,6 +3,7 @@ id: 0004
 status: accepted
 supersedes: null
 superseded_by: null
+assertions: [teddy:lint]
 rubric_refs: []
 ---
 

@@ -1,47 +1,50 @@
-// Deterministic gate over iterations/*/scores.json + tickets + the iteration
-// registry: schema integrity, weighted-aggregation correctness, evidence
-// verification for open iterations (adr/0006: gates and signals are re-run
-// and must agree with what was recorded; llm scores are bounded by their
-// evidence), and the per-criterion baseline gate (fails closed).
-// Usage: node checks/scores-check.ts [root]
+// Deterministic gate over iterations/*/{ticket.md,scores.json}: schema
+// integrity, ticket cross-checks, evidence verification for open iterations
+// (adr/0006: gates and signals are re-run and must agree with what was
+// recorded; llm scores are bounded by their evidence), and the per-criterion
+// baseline gate (fails closed). Iterations, their status, and their
+// baseline are derived from the directory and git (adr/0005, adr/0007) —
+// there is no registry.
+// Usage: node scores-check.ts [--json] [root]
 // Exit 0 = consistent, 1 = failures listed below.
-import { basename, dirname, join } from "node:path";
-import { existsSync, readdirSync } from "node:fs";
 import {
+  emitResult,
   exists,
   isGitRepo,
-  iterationStatus,
-  loadRubric,
+  listIterations,
+  loadConfig,
   parseFrontmatter,
   readJson,
   readText,
-  RUBRIC_PATH,
   runCheck,
   weightedOverall,
   type CheckResult,
-  type LoadedRubric,
+  type Iteration,
+  type ResolvedConfig,
   type RubricCriterion,
-} from "./lib.ts";
+} from "../lib.ts";
 
-const root = process.argv[2] ?? process.cwd();
+const args = process.argv.slice(2);
+const json = args.includes("--json");
+const root = args.find((a) => !a.startsWith("--")) ?? process.cwd();
+const log = (msg: string): void => (json ? console.error(msg) : console.log(msg));
 const fails: string[] = [];
 function fail(msg: string): void {
   fails.push(msg);
 }
 
-let rubric: LoadedRubric;
+let cfg: ResolvedConfig;
 try {
-  rubric = await loadRubric(root);
+  cfg = await loadConfig(root);
 } catch (e) {
   console.error(`FAIL: ${(e as Error).message}`);
-  process.exit(1);
+  emitResult("scores-check", "fail", json);
 }
+const rubric = cfg.rubric;
 
-interface IterationEntry {
-  id: string;
-  ticket: string;
-  scores: string;
-  baseline: string | null;
+if (!isGitRepo(root)) {
+  console.error("FAIL: cannot derive iterations — not a git repository (adr/0003, adr/0005)");
+  emitResult("scores-check", "fail", json);
 }
 
 interface ScoreEntry {
@@ -53,52 +56,27 @@ interface ScoreEntry {
 }
 
 interface Scores {
-  iteration: string;
-  ticket: string;
-  baseline: string | null;
   timestamp: string;
   criteria: Record<string, ScoreEntry>;
-  overall: number;
-  deterministic_gate: string;
 }
 
-const registry = readJson<{ version: number; iterations: IterationEntry[] }>(
-  root,
-  "manifest-of-iterations.json",
-);
-const byId = new Map<string, IterationEntry>();
-for (const e of registry.iterations) {
-  if (byId.has(e.id)) fail(`manifest-of-iterations.json: duplicate iteration '${e.id}'`);
-  byId.set(e.id, e);
-}
-for (const e of registry.iterations) {
-  if (e.baseline !== null && !byId.has(e.baseline)) {
-    fail(`manifest-of-iterations.json: '${e.id}' baseline '${e.baseline}' does not resolve`);
-  }
-  if (!exists(root, e.ticket)) fail(`manifest-of-iterations.json: '${e.id}' ticket missing: ${e.ticket}`);
-  if (!exists(root, e.scores)) fail(`manifest-of-iterations.json: '${e.id}' scores missing: ${e.scores}`);
-  if ("status" in e) {
-    fail(
-      `manifest-of-iterations.json: '${e.id}' legacy field 'status' — removed by adr/0005 ` +
-        `(closure is derived from merge history, never stored)`,
-    );
-  }
-}
+const LEGACY_SCORE_FIELDS = ["iteration", "ticket", "baseline", "overall", "deterministic_gate", "approved_by"];
 
-// Also catch iteration directories that exist on disk but are not registered.
-const iterDir = join(root, "iterations");
-const onDisk = existsSync(iterDir)
-  ? readdirSync(iterDir).filter((d) => !d.startsWith("."))
-  : [];
-for (const d of onDisk) {
-  if (!byId.has(d)) fail(`iterations/${d}: not registered in manifest-of-iterations.json`);
-  else if (!/^\d{4}-[a-z0-9-]+$/.test(d)) {
-    fail(`iterations/${d}: directory name must match NNNN-slug`);
+const iterations = listIterations(root, cfg);
+const byId = new Map<string, Iteration>(iterations.map((it) => [it.id, it]));
+for (const it of iterations) {
+  if (!cfg.pattern.test(it.id)) fail(`${it.dir}: directory name does not match pattern ${cfg.pattern}`);
+  if (!exists(root, it.ticket)) fail(`${it.dir}: ticket.md missing`);
+  if (!exists(root, it.scores)) fail(`${it.dir}: scores.json missing`);
+  // An iteration directory on the trunk without a merge commit touching it
+  // was squash/rebase-merged — closure cannot be derived (adr/0003, adr/0005).
+  if (it.status === "open" && it.onTrunk) {
+    fail(`${it.dir}: on the trunk but no merge commit touches it — squash/rebase merges defeat traceability`);
   }
 }
 
 const scoresById = new Map<string, Scores>();
-for (const entry of registry.iterations) {
+for (const entry of iterations) {
   if (!exists(root, entry.scores)) continue;
   let scores: Scores;
   try {
@@ -109,29 +87,21 @@ for (const entry of registry.iterations) {
   }
   scoresById.set(entry.id, scores);
   const rel = entry.scores;
-  const dirName = basename(dirname(rel));
 
-  if (scores.iteration !== entry.id) {
-    fail(`${rel}: 'iteration' '${scores.iteration}' does not match registry id '${entry.id}'`);
-  }
-  if (!/^\d{4}-[a-z0-9-]+$/.test(dirName) || dirName !== entry.id) {
-    fail(`${rel}: must live in iterations/${entry.id}/`);
-  }
   if (!/^\d{4}-\d{2}-\d{2}T/.test(String(scores.timestamp))) {
     fail(`${rel}: 'timestamp' must be ISO-8601`);
   }
-  if (scores.deterministic_gate !== "pass") {
-    fail(`${rel}: 'deterministic_gate' must be 'pass' (raw tests/lints are a hard gate)`);
-  }
-  if ("approved_by" in scores) {
-    fail(`${rel}: legacy field 'approved_by' — removed by adr/0003 (closure is scribe-owned)`);
+  for (const legacy of LEGACY_SCORE_FIELDS) {
+    if (legacy in scores) {
+      fail(`${rel}: legacy field '${legacy}' — derived from the directory, git, or the rubric; never stored (adr/0007)`);
+    }
   }
 
-  // Ticket cross-checks.
+  // Ticket cross-checks: the ticket id is the iteration's number.
   if (exists(root, entry.ticket)) {
     const { fm } = parseFrontmatter(readText(root, entry.ticket), entry.ticket);
-    if (fm.id !== scores.ticket) {
-      fail(`${entry.ticket}: id '${fm.id}' does not match scores ticket '${scores.ticket}'`);
+    if (typeof fm.id !== "string" || !entry.id.startsWith(`${fm.id}-`)) {
+      fail(`${entry.ticket}: id '${fm.id}' does not match directory '${entry.id}'`);
     }
     const type = fm.type;
     if (typeof type !== "string" || !["feature", "bugfix", "skill", "decision", "refactor"].includes(type)) {
@@ -158,7 +128,7 @@ for (const entry of registry.iterations) {
   for (const [id, c] of Object.entries(scores.criteria ?? {})) {
     const crit = rubric.byId[id];
     if (!crit) {
-      fail(`${rel}: unknown criterion '${id}' (not in ${RUBRIC_PATH})`);
+      fail(`${rel}: unknown criterion '${id}' (not in the rubric)`);
       continue;
     }
     if (c.score !== null && (typeof c.score !== "number" || c.score < 0 || c.score > 1)) {
@@ -166,7 +136,7 @@ for (const entry of registry.iterations) {
     }
     if (c.score !== null) exercised++;
     if (c.judge !== crit.judge) {
-      fail(`${rel}: criterion '${id}' judge '${c.judge}' does not match ${RUBRIC_PATH} judge '${crit.judge}'`);
+      fail(`${rel}: criterion '${id}' judge '${c.judge}' does not match the rubric's judge '${crit.judge}'`);
     }
     if (typeof c.rationale !== "string" || c.rationale.length === 0) {
       fail(`${rel}: criterion '${id}' missing rationale`);
@@ -221,57 +191,49 @@ for (const entry of registry.iterations) {
   }
   if (exercised === 0) fail(`${rel}: every criterion is null — nothing was exercised`);
 
-  const computed = weightedOverall(scores.criteria, rubric);
-  if (computed !== null && Math.abs(computed - scores.overall) > 1e-6) {
-    fail(
-      `${rel}: overall ${scores.overall} != weighted ${Number(computed.toFixed(6))} ` +
-        `(weights from ${RUBRIC_PATH}, non-null criteria only)`,
-    );
-  }
+  // overall is derived (adr/0007) — computed here only to validate weights resolve.
+  weightedOverall(scores.criteria, rubric);
 }
 
 // Evidence verification (adr/0006): for every open iteration — the one(s)
 // under review on this ref — re-run each declared gate and signal against
 // the tree and require the recorded evidence to agree. Closed iterations
 // were verified on their PR run; their tree no longer exists.
-const verifyEvidence = isGitRepo(root);
 const checkCache = new Map<string, CheckResult>();
 function measured(id: string): CheckResult {
   let r = checkCache.get(id);
   if (!r) {
-    r = runCheck(root, id);
+    r = runCheck(root, cfg, id);
     checkCache.set(id, r);
   }
   return r;
 }
-if (verifyEvidence) {
-  for (const entry of registry.iterations) {
-    const scores = scoresById.get(entry.id);
-    if (!scores || iterationStatus(root, entry.id) !== "open") continue;
-    for (const [id, c] of Object.entries(scores.criteria)) {
-      const crit: RubricCriterion | undefined = rubric.byId[id];
-      if (!crit || !c.gates || !c.signals) continue;
-      for (const g of crit.gates) {
-        const actual = measured(g).verdict;
-        if (actual === "fail") fail(`${entry.scores}: gate '${g}' fails on this tree (recorded ${c.gates[g]})`);
-        else if (c.gates[g] !== actual) {
-          fail(`${entry.scores}: gate '${g}' recorded ${c.gates[g]} but measures ${actual}`);
-        }
+for (const entry of iterations) {
+  const scores = scoresById.get(entry.id);
+  if (!scores || entry.status !== "open") continue;
+  for (const [id, c] of Object.entries(scores.criteria)) {
+    const crit: RubricCriterion | undefined = rubric.byId[id];
+    if (!crit || !c.gates || !c.signals) continue;
+    for (const g of crit.gates) {
+      const actual = measured(g).verdict;
+      if (actual === "fail") fail(`${entry.scores}: gate '${g}' fails on this tree (recorded ${c.gates[g]})`);
+      else if (c.gates[g] !== actual) {
+        fail(`${entry.scores}: gate '${g}' recorded ${c.gates[g]} but measures ${actual}`);
       }
-      for (const sig of crit.signals) {
-        const key = `${sig.check}.${sig.metric}`;
-        const m = measured(sig.check);
-        if (m.verdict === "fail") {
-          fail(`${entry.scores}: signal check '${sig.check}' fails on this tree`);
-          continue;
-        }
-        const actual = m.signals[sig.metric];
-        const recorded = c.signals[key];
-        if (actual === undefined && recorded !== undefined) {
-          fail(`${entry.scores}: signal '${key}' recorded ${recorded} but is unmeasured on this tree`);
-        } else if (actual !== undefined && (recorded === undefined || Math.abs(actual - recorded) > 1e-6)) {
-          fail(`${entry.scores}: signal '${key}' recorded ${String(recorded)} but measures ${actual}`);
-        }
+    }
+    for (const sig of crit.signals) {
+      const key = `${sig.check}.${sig.metric}`;
+      const m = measured(sig.check);
+      if (m.verdict === "fail") {
+        fail(`${entry.scores}: signal check '${sig.check}' fails on this tree`);
+        continue;
+      }
+      const actual = m.signals[sig.metric];
+      const recorded = c.signals[key];
+      if (actual === undefined && recorded !== undefined) {
+        fail(`${entry.scores}: signal '${key}' recorded ${recorded} but is unmeasured on this tree`);
+      } else if (actual !== undefined && (recorded === undefined || Math.abs(actual - recorded) > 1e-6)) {
+        fail(`${entry.scores}: signal '${key}' recorded ${String(recorded)} but measures ${actual}`);
       }
     }
   }
@@ -286,7 +248,7 @@ if (verifyEvidence) {
 // iterations exercising different criteria sets are not comparable through
 // it. Fails closed.
 function latestPrior(
-  entry: IterationEntry,
+  entry: Iteration,
   pick: (s: Scores) => number | null | undefined,
 ): { value: number; from: string } | null {
   let cursor = entry.baseline;
@@ -303,10 +265,9 @@ function latestPrior(
   return null;
 }
 
-for (const entry of registry.iterations) {
+for (const entry of iterations) {
   const scores = scoresById.get(entry.id);
   if (!scores || entry.baseline === null) continue;
-  if (!byId.has(entry.baseline)) continue; // already failed above
   for (const [id, c] of Object.entries(scores.criteria)) {
     const crit = rubric.byId[id];
     if (!crit) continue;
@@ -336,28 +297,10 @@ for (const entry of registry.iterations) {
   }
 }
 
-// Closure order (adr/0003, adr/0005): closure is derived — an iteration is
-// closed iff a merge commit touches its directory — so there is nothing to
-// reconcile, only order to enforce: a closed iteration whose baseline is
-// still open means an out-of-order or squash/rebase merge, which defeats
-// the baseline chain.
-if (!isGitRepo(root)) {
-  fail("cannot derive iteration closure — not a git repository (adr/0003, adr/0005)");
-} else {
-  for (const entry of registry.iterations) {
-    if (entry.baseline === null || !byId.has(entry.baseline)) continue;
-    if (iterationStatus(root, entry.id) === "closed" && iterationStatus(root, entry.baseline) === "open") {
-      fail(
-        `${entry.scores}: closed (merged) while baseline '${entry.baseline}' is still open — ` +
-          `out-of-order merge, or the baseline's PR was squash/rebase-merged (adr/0003)`,
-      );
-    }
-  }
-}
-
 if (fails.length > 0) {
   for (const f of fails) console.error(`FAIL: ${f}`);
   console.error(`\nscores-check: ${fails.length} failure(s)`);
-  process.exit(1);
+  emitResult("scores-check", "fail", json);
 }
-console.log(`scores-check: OK (${registry.iterations.length} iterations)`);
+log(`scores-check: OK (${iterations.length} iterations)`);
+emitResult("scores-check", "pass", json);

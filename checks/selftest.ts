@@ -1,16 +1,18 @@
-// Selftest: verifies that Teddy's deterministic checks fail on broken trees
-// and pass on valid ones. Runs each check as a subprocess against throwaway
-// fixture trees — real git repositories, since merge traceability is part of
-// the gates (adr/0003: merge = approval) and iteration closure is derived
-// from it (adr/0005).
-// Usage: node checks/selftest.ts
+// Selftest: Teddy's own host check (adr/0007). Verifies that the built-in
+// checks fail on broken trees and pass on valid ones, running each as a
+// subprocess against throwaway fixture trees — real git repositories, since
+// merge traceability is part of the gates (adr/0003) and iteration closure
+// and baselines are derived from it (adr/0005, adr/0007).
+// Usage: node checks/selftest.ts [--json]
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const checksDir = dirname(fileURLToPath(import.meta.url));
+const checksDir = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "checks");
+const commandsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "commands");
+const json = process.argv.includes("--json");
 
 function write(root: string, rel: string, content: string): void {
   const file = join(root, rel);
@@ -37,7 +39,8 @@ function runEnv(
   script: string,
   ...args: string[]
 ): SpawnResult {
-  const res = spawnSync(process.execPath, [join(checksDir, script), ...args, root], {
+  const dir = script === "report.ts" ? commandsDir : checksDir;
+  const res = spawnSync(process.execPath, [join(dir, script), ...args, root], {
     encoding: "utf8",
     // Pin the event context: fixtures must not inherit CI's pull_request
     // environment (strict local semantics unless a case asks otherwise).
@@ -54,50 +57,53 @@ interface SpawnResult {
   output: string;
 }
 
-// adr/0006: the rubric is a typed TS module. The fixture's gate is the
-// empty checks/dummy-check.ts (exit 0 → pass by exit code).
-const RUBRIC = `import type { Rubric } from "../checks/lib.ts";
+// adr/0007: the rubric lives in teddy.config.ts. The fixture's gate is the
+// host check checks/dummy-check.ts (empty → exit 0 → pass by exit code).
+const CONFIG = `import type { Config } from "teddy";
 
 export default {
-  version: 2,
-  tolerance: 0.1,
-  criteria: [
-    {
-      id: "adr-traceability",
-      description: "Every accepted ADR has >=1 linked assertion or criterion",
-      weight: 2,
-      gates: ["dummy-check"],
-      signals: [],
-      judge: "none",
-    },
-    {
-      id: "cockpit-clarity",
-      description: "Dashboard is clear",
-      weight: 1,
-      gates: [],
-      signals: [],
-      judge: "llm",
-      anchors: { 0: "unclear", 0.5: "partly", 1: "clear" },
-    },
-  ],
-  adrs: { "0001-fixture": ["adr-traceability"] },
-} satisfies Rubric;
+  rubric: {
+    version: 2,
+    tolerance: 0.1,
+    criteria: [
+      {
+        id: "adr-traceability",
+        description: "Every accepted ADR has >=1 linked assertion or criterion",
+        weight: 2,
+        gates: ["dummy-check"],
+        signals: [],
+        judge: "none",
+      },
+      {
+        id: "cockpit-clarity",
+        description: "Dashboard is clear",
+        weight: 1,
+        gates: [],
+        signals: [],
+        judge: "llm",
+        anchors: { 0: "unclear", 0.5: "partly", 1: "clear" },
+      },
+    ],
+  },
+} satisfies Config;
 `;
 
 // Signal-bearing variant: a fake coverage adapter emitting a fixed value.
-const RUBRIC_SIGNALS = RUBRIC.replace(
-  'gates: ["dummy-check"],\n      signals: [],',
-  'gates: ["dummy-check"],\n      signals: [{ check: "fake-cov", metric: "total", min: 0.5, ratchet: true }],',
+const CONFIG_SIGNALS = CONFIG.replace(
+  'gates: ["dummy-check"],\n        signals: [],',
+  'gates: ["dummy-check"],\n        signals: [{ check: "fake-cov", metric: "total", min: 0.5, ratchet: true }],',
 );
 const FAKE_COV = (value: number): string =>
   `console.log(JSON.stringify({ id: "fake-cov", verdict: "pass", signals: { total: ${value} } }));\n`;
 
-// adr/0003 schema: no approved_by — approval is the merge.
+// adr/0003 schema: no approved_by — approval is the merge. adr/0007: the
+// frontmatter carries assertions; there is no manifest.
 const ADR = `---
 id: 0001
 status: proposed
 supersedes: null
 superseded_by: null
+assertions: [checks/dummy-check.ts]
 rubric_refs: [adr-traceability]
 ---
 
@@ -105,31 +111,6 @@ rubric_refs: [adr-traceability]
 `;
 
 const ADR_ACCEPTED = ADR.replace("status: proposed", "status: accepted");
-
-const MANIFEST = `{
-  "version": 1,
-  "adrs": {
-    "0001-fixture": {
-      "status": "proposed",
-      "assertions": ["checks/dummy-check.ts"],
-      "criteria": ["adr-traceability"]
-    }
-  }
-}
-`;
-
-const MANIFEST_OF_ITERATIONS = `{
-  "version": 1,
-  "iterations": [
-    {
-      "id": "0001-fixture",
-      "ticket": "iterations/0001-fixture/ticket.md",
-      "scores": "iterations/0001-fixture/scores.json",
-      "baseline": null
-    }
-  ]
-}
-`;
 
 const TICKET = `---
 id: 0001
@@ -140,17 +121,13 @@ adr_refs: [0001]
 ---
 `;
 
+// adr/0007: scores.json is timestamp + criteria; everything else is derived.
 const SCORES = `{
-  "iteration": "0001-fixture",
-  "ticket": "0001",
-  "baseline": null,
   "timestamp": "2026-09-11T00:00:00Z",
   "criteria": {
     "adr-traceability": { "score": 1, "judge": "none", "rationale": "ok", "gates": { "dummy-check": "pass" }, "signals": {} },
     "cockpit-clarity": { "score": null, "judge": "llm", "rationale": "not exercised", "gates": {}, "signals": {} }
-  },
-  "overall": 1,
-  "deterministic_gate": "pass"
+  }
 }
 `;
 
@@ -158,34 +135,22 @@ const SCORES = `{
 const SCORES_SIG = (value: number): string =>
   SCORES.replace('"signals": {} },\n    "cockpit', `"signals": { "fake-cov.total": ${value} } },\n    "cockpit`);
 
-// Second iteration variants layered on the valid base. Under the adr/0001
-// amended gate (paired per-criterion non-regression) F1 must fail and F2
-// must pass.
+// Second iteration variants layered on the valid base.
 const SCORES_0002 = `{
-  "iteration": "0002-fixture",
-  "ticket": "0002",
-  "baseline": "0001-fixture",
   "timestamp": "2026-09-11T01:00:00Z",
   "criteria": {
     "adr-traceability": { "score": 1, "judge": "none", "rationale": "ok", "gates": { "dummy-check": "pass" }, "signals": {} },
     "cockpit-clarity": { "score": 0, "judge": "llm", "rationale": "worse", "gates": {}, "signals": {} }
-  },
-  "overall": 0.6666666666666666,
-  "deterministic_gate": "pass"
+  }
 }
 `;
 
 const SCORES_0002_REGRESSION = `{
-  "iteration": "0002-fixture",
-  "ticket": "0002",
-  "baseline": "0001-fixture",
   "timestamp": "2026-09-11T01:00:00Z",
   "criteria": {
     "adr-traceability": { "score": 1, "judge": "none", "rationale": "ok", "gates": { "dummy-check": "pass" }, "signals": {} },
     "cockpit-clarity": { "score": 0.85, "judge": "llm", "rationale": "slipped, see cockpit/main.ts", "gates": {}, "signals": {} }
-  },
-  "overall": 0.95,
-  "deterministic_gate": "pass"
+  }
 }
 `;
 
@@ -200,44 +165,38 @@ adr_refs: [0001]
 
 function makeTree(): string {
   const root = mkdtempSync(join(tmpdir(), "teddy-selftest-"));
-  write(root, "rubrics/rubric.ts", RUBRIC);
+  write(root, ".gitignore", "cockpit/\nnode_modules/\n");
+  write(root, "teddy.config.ts", CONFIG);
   write(root, "adr/0001-fixture.md", ADR);
-  write(root, "manifest.json", MANIFEST);
-  write(root, "manifest-of-iterations.json", MANIFEST_OF_ITERATIONS);
   write(root, "checks/dummy-check.ts", "");
-  write(root, "iterations/0001-fixture/ticket.md", TICKET);
-  write(root, "iterations/0001-fixture/scores.json", SCORES);
   gitc(root, "init", "-q", "-b", "main");
   gitc(root, "config", "user.email", "check@teddy.local");
   gitc(root, "config", "user.name", "Teddy Check");
   gitc(root, "add", "-A");
   gitc(root, "commit", "-qm", "base");
+  // The iteration under review lives on its branch, as in real life; the
+  // trunk has no iterations until a merge lands one (adr/0007).
+  gitc(root, "checkout", "-qb", "iteration/0001-fixture");
+  write(root, "iterations/0001-fixture/ticket.md", TICKET);
+  write(root, "iterations/0001-fixture/scores.json", SCORES);
+  gitc(root, "add", "-A");
+  gitc(root, "commit", "-qm", "scaffold 0001");
   return root;
 }
 
+function addIteration(root: string, id: string, scores: string): void {
+  write(root, `iterations/${id}/ticket.md`, TICKET_0002.replace("id: 0002", `id: ${id.slice(0, 4)}`));
+  write(root, `iterations/${id}/scores.json`, scores);
+}
 function addIteration0002(root: string, scores: string): void {
-  write(root, "iterations/0002-fixture/ticket.md", TICKET_0002);
-  write(root, "iterations/0002-fixture/scores.json", scores);
-  const entries = JSON.parse(readText(root, "manifest-of-iterations.json"));
-  entries.iterations.push({
-    id: "0002-fixture",
-    ticket: "iterations/0002-fixture/ticket.md",
-    scores: "iterations/0002-fixture/scores.json",
-    baseline: "0001-fixture",
-  });
-  write(root, "manifest-of-iterations.json", `${JSON.stringify(entries, null, 2)}\n`);
+  addIteration(root, "0002-fixture", scores);
 }
 
-// Land the accepted ADR (and mirrored manifest status) via a true merge
-// commit — the only acceptance path under adr/0003.
-function acceptViaMerge(root: string, withManifest = true): void {
+// Land the accepted ADR via a true merge commit — the only acceptance path
+// under adr/0003.
+function acceptViaMerge(root: string): void {
   gitc(root, "checkout", "-qb", "feat");
   write(root, "adr/0001-fixture.md", ADR_ACCEPTED);
-  if (withManifest) {
-    const m = JSON.parse(readText(root, "manifest.json"));
-    m.adrs["0001-fixture"].status = "accepted";
-    write(root, "manifest.json", `${JSON.stringify(m, null, 2)}\n`);
-  }
   gitc(root, "add", "-A");
   gitc(root, "commit", "-qm", "accept 0001");
   gitc(root, "checkout", "-q", "main");
@@ -255,7 +214,7 @@ function mergeIteration(root: string, id: string, branch: string, prNo: number):
   gitc(root, "merge", "-q", "--no-ff", branch, "-m", `Merge pull request #${prNo} from t/${branch}`);
 }
 
-function dataIteration(root: string, id: string): { status: string; pr: number | null } | undefined {
+function dataIteration(root: string, id: string): { status: string; pr: number | null; baseline: string | null } | undefined {
   const js = readText(root, "cockpit/data.js");
   const data = JSON.parse(js.slice(js.indexOf("=") + 1).trim().replace(/;$/, ""));
   return data.iterations.find((i: { id: string }) => i.id === id);
@@ -295,7 +254,7 @@ try {
     roots.push(root);
     const ms = run(root, "manifest-sync.ts");
     const sc = run(root, "scores-check.ts");
-    const repCheck = run(root, "cockpit-report.ts", "--check");
+    const repCheck = run(root, "report.ts", "--check");
     expect("valid tree: manifest-sync passes", ms.ok, ms.output);
     expect("valid tree: scores-check passes", sc.ok, sc.output);
     expect(
@@ -303,9 +262,9 @@ try {
       repCheck.ok && !existsSync(join(root, "cockpit/data.js")),
       repCheck.output,
     );
-    const rep = run(root, "cockpit-report.ts");
+    const rep = run(root, "report.ts");
     expect(
-      "valid tree: cockpit-report derives 'open' for an unmerged iteration",
+      "valid tree: report derives 'open' for an unmerged iteration",
       rep.ok && dataIteration(root, "0001-fixture")?.status === "open" && dataIteration(root, "0001-fixture")?.pr === null,
       rep.output,
     );
@@ -316,9 +275,6 @@ try {
     const root = makeTree();
     roots.push(root);
     write(root, "adr/0001-fixture.md", ADR_ACCEPTED);
-    const m = JSON.parse(readText(root, "manifest.json"));
-    m.adrs["0001-fixture"].status = "accepted";
-    write(root, "manifest.json", `${JSON.stringify(m, null, 2)}\n`);
     gitc(root, "add", "-A");
     gitc(root, "commit", "-qm", "accepted directly");
     const ms = run(root, "manifest-sync.ts");
@@ -342,30 +298,35 @@ try {
     );
   }
 
-  // D — manifest criteria drift against rubric.ts.
+  // D — frontmatter links must resolve: unknown criterion, missing
+  // assertion file, legacy manifest.
   {
     const root = makeTree();
     roots.push(root);
-    const manifest = JSON.parse(readText(root, "manifest.json"));
-    manifest.adrs["0001-fixture"].criteria = ["adr-traceability", "cockpit-clarity"];
-    write(root, "manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
+    write(root, "adr/0001-fixture.md", ADR.replace("rubric_refs: [adr-traceability]", "rubric_refs: [nonexistent]"));
     const ms = run(root, "manifest-sync.ts");
+    expect("unknown rubric_ref is rejected", !ms.ok && ms.output.includes("unknown criterion"), ms.output);
+    write(root, "adr/0001-fixture.md", ADR.replace("assertions: [checks/dummy-check.ts]", "assertions: [checks/missing.ts]"));
+    const ms2 = run(root, "manifest-sync.ts");
+    expect("missing assertion file is rejected", !ms2.ok && ms2.output.includes("does not exist"), ms2.output);
+    write(root, "adr/0001-fixture.md", ADR.replace("assertions: [checks/dummy-check.ts]", "assertions: [teddy:lint, teddy:nope]"));
+    const ms3 = run(root, "manifest-sync.ts");
     expect(
-      "manifest/rubric criteria drift is rejected",
-      !ms.ok && ms.output.includes("drift"),
-      ms.output,
+      "teddy: assertion resolves to built-ins only",
+      !ms3.ok && ms3.output.includes("'teddy:nope'") && !ms3.output.includes("'teddy:lint'"),
+      ms3.output,
     );
   }
 
-  // E — stored overall disagrees with the weighted aggregation formula.
+  // E — legacy scores.json fields (derived since adr/0007) are rejected.
   {
     const root = makeTree();
     roots.push(root);
-    write(root, "iterations/0001-fixture/scores.json", SCORES.replace('"overall": 1', '"overall": 0.5'));
+    write(root, "iterations/0001-fixture/scores.json", SCORES.replace('"criteria"', '"overall": 1,\n  "baseline": null,\n  "criteria"'));
     const sc = run(root, "scores-check.ts");
     expect(
-      "wrong precomputed overall is rejected",
-      !sc.ok && sc.output.includes("overall"),
+      "legacy scores fields are rejected",
+      !sc.ok && sc.output.includes("legacy field 'overall'") && sc.output.includes("legacy field 'baseline'"),
       sc.output,
     );
   }
@@ -387,7 +348,7 @@ try {
       !sc.ok && sc.output.includes("per-criterion regression") && sc.output.includes("tolerance"),
       sc.output,
     );
-    write(root, "iterations/0002-fixture/scores.json", SCORES_0002_REGRESSION.replace('"score": 0.85', '"score": 0.9').replace('"overall": 0.95', '"overall": 0.9666666666666667'));
+    write(root, "iterations/0002-fixture/scores.json", SCORES_0002_REGRESSION.replace('"score": 0.85', '"score": 0.9'));
     const within = run(root, "scores-check.ts");
     expect("llm drop within tolerance passes", within.ok, within.output);
   }
@@ -405,7 +366,7 @@ try {
       sc.output,
     );
     write(root, "checks/dummy-check.ts", "");
-    write(root, "iterations/0001-fixture/scores.json", SCORES.replace('"score": 1, "judge": "none"', '"score": 0.5, "judge": "none"').replace('"overall": 1', '"overall": 0.5'));
+    write(root, "iterations/0001-fixture/scores.json", SCORES.replace('"score": 1, "judge": "none"', '"score": 0.5, "judge": "none"'));
     const half = run(root, "scores-check.ts");
     expect(
       "judge none with passing evidence must score 1",
@@ -419,12 +380,11 @@ try {
   {
     const root = makeTree();
     roots.push(root);
-    write(root, "rubrics/rubric.ts", RUBRIC.replace('gates: [],\n      signals: [],\n      judge: "llm"', 'gates: ["dummy-check"],\n      signals: [],\n      judge: "llm"'));
+    write(root, "teddy.config.ts", CONFIG.replace('gates: [],\n        signals: [],\n        judge: "llm"', 'gates: ["dummy-check"],\n        signals: [],\n        judge: "llm"'));
     write(root, "checks/dummy-check.ts", 'console.log(JSON.stringify({ id: "dummy-check", verdict: "skip", signals: {} }));\n');
     write(root, "iterations/0001-fixture/scores.json", SCORES
       .replace('"score": 1, "judge": "none", "rationale": "ok", "gates": { "dummy-check": "pass" }', '"score": null, "judge": "none", "rationale": "skipped", "gates": { "dummy-check": "skip" }')
-      .replace('"score": null, "judge": "llm", "rationale": "not exercised", "gates": {}', '"score": 0.9, "judge": "llm", "rationale": "fine", "gates": { "dummy-check": "skip" }')
-      .replace('"overall": 1', '"overall": 0.9'));
+      .replace('"score": null, "judge": "llm", "rationale": "not exercised", "gates": {}', '"score": 0.9, "judge": "llm", "rationale": "fine", "gates": { "dummy-check": "skip" }'));
     const sc = run(root, "scores-check.ts");
     expect(
       "llm score above 0.5 with skipped evidence is capped",
@@ -434,8 +394,7 @@ try {
     const root2 = makeTree();
     roots.push(root2);
     write(root2, "iterations/0001-fixture/scores.json", SCORES
-      .replace('"score": null, "judge": "llm", "rationale": "not exercised"', '"score": 0.9, "judge": "llm", "rationale": "looks great"')
-      .replace('"overall": 1', '"overall": 0.9333333333333333'));
+      .replace('"score": null, "judge": "llm", "rationale": "not exercised"', '"score": 0.9, "judge": "llm", "rationale": "looks great"'));
     const sc2 = run(root2, "scores-check.ts");
     expect(
       "llm score above 0.5 with no evidence and no cited file is capped",
@@ -449,7 +408,7 @@ try {
   {
     const root = makeTree();
     roots.push(root);
-    write(root, "rubrics/rubric.ts", RUBRIC_SIGNALS);
+    write(root, "teddy.config.ts", CONFIG_SIGNALS);
     write(root, "checks/fake-cov.ts", FAKE_COV(0.8));
     write(root, "iterations/0001-fixture/scores.json", SCORES_SIG(0.8));
     gitc(root, "add", "-A");
@@ -486,30 +445,130 @@ try {
     );
   }
 
-  // F6 — the rubric is code: any import beyond its own type is rejected.
+  // F6 — the config is data: any import beyond types is rejected; the
+  // rubric is validated; gates must resolve; unknown keys fail.
   {
     const root = makeTree();
     roots.push(root);
-    write(root, "rubrics/rubric.ts", RUBRIC.replace('import type { Rubric } from "../checks/lib.ts";', 'import type { Rubric } from "../checks/lib.ts";\nimport { execSync } from "node:child_process";'));
+    write(root, "teddy.config.ts", CONFIG.replace('import type { Config } from "teddy";', 'import type { Config } from "teddy";\nimport { execSync } from "node:child_process";'));
     const ms = run(root, "manifest-sync.ts");
     expect(
-      "rubric importing anything but its type is rejected",
+      "config importing anything but types is rejected",
       !ms.ok && ms.output.includes("only 'import type"),
       ms.output,
     );
-    write(root, "rubrics/rubric.ts", RUBRIC.replace('anchors: { 0: "unclear", 0.5: "partly", 1: "clear" },', ''));
+    write(root, "teddy.config.ts", CONFIG.replace('anchors: { 0: "unclear", 0.5: "partly", 1: "clear" },', ''));
     const noAnchors = run(root, "manifest-sync.ts");
     expect(
       "llm criterion without anchors is rejected",
       !noAnchors.ok && noAnchors.output.includes("requires anchors"),
       noAnchors.output,
     );
-    write(root, "rubrics/rubric.ts", RUBRIC.replace('gates: ["dummy-check"]', 'gates: ["nonexistent"]'));
+    write(root, "teddy.config.ts", CONFIG.replace('gates: ["dummy-check"]', 'gates: ["nonexistent"]'));
     const noGate = run(root, "manifest-sync.ts");
     expect(
       "gate without a check script is rejected",
-      !noGate.ok && noGate.output.includes("has no checks/nonexistent.ts"),
+      !noGate.ok && noGate.output.includes("resolves to no check"),
       noGate.output,
+    );
+    write(root, "teddy.config.ts", CONFIG.replace("export default {", "export default {\n  bogus: 1,"));
+    const unknown = run(root, "manifest-sync.ts");
+    expect("unknown config key is rejected", !unknown.ok && unknown.output.includes("unknown key 'bogus'"), unknown.output);
+  }
+
+  // F7 — zero-config host: no teddy.config.ts → default rubric, default dirs;
+  // a host check overrides a built-in of the same id.
+  {
+    const root = makeTree();
+    roots.push(root);
+    rmSync(join(root, "teddy.config.ts"));
+    write(root, "package.json", pkgWith({}));
+    write(root, "adr/0001-fixture.md", ADR.replace("rubric_refs: [adr-traceability]", "rubric_refs: [traceability]"));
+    write(root, "iterations/0001-fixture/scores.json", `{
+  "timestamp": "2026-09-11T00:00:00Z",
+  "criteria": {
+    "traceability": { "score": 1, "judge": "none", "rationale": "ok", "gates": { "manifest-sync": "pass" }, "signals": {} },
+    "hygiene": { "score": null, "judge": "none", "rationale": "typecheck and lint skipped: nothing declared", "gates": { "typecheck": "skip", "lint": "skip" }, "signals": {} },
+    "correctness": { "score": null, "judge": "none", "rationale": "no test runner", "gates": { "test": "skip" }, "signals": {} }
+  }
+}
+`);
+    const ms = run(root, "manifest-sync.ts");
+    const sc = run(root, "scores-check.ts");
+    expect("zero-config host: manifest-sync passes with the default rubric", ms.ok, ms.output);
+    expect("zero-config host: scores-check verifies built-in gates", sc.ok, sc.output);
+    // Override: a host checks/lint.ts that fails must win over the built-in.
+    write(root, "checks/lint.ts", "process.exit(1);\n");
+    write(root, "adr/0001-fixture.md", ADR.replace("rubric_refs: [adr-traceability]", "rubric_refs: [traceability]").replace("assertions: [checks/dummy-check.ts]", "assertions: [checks/dummy-check.ts, checks/lint.ts]"));
+    const over = run(root, "scores-check.ts");
+    expect(
+      "host check overrides the built-in of the same id",
+      !over.ok && over.output.includes("gate 'lint' fails on this tree"),
+      over.output,
+    );
+  }
+
+  // F8 — derived baselines (adr/0007): linear merges, several iterations in
+  // one merge (by number), and concurrent branches off the same trunk.
+  {
+    const root = makeTree();
+    roots.push(root);
+    // 0001 and 0002 land in one merge; 0003 in the next.
+    addIteration0002(root, SCORES_0002);
+    gitc(root, "checkout", "-qb", "pr1");
+    gitc(root, "add", "-A");
+    gitc(root, "commit", "-qm", "0001+0002");
+    gitc(root, "checkout", "-q", "main");
+    gitc(root, "merge", "-q", "--no-ff", "pr1", "-m", "Merge pull request #1 from t/pr1");
+    addIteration(root, "0003-fixture", SCORES_0002);
+    gitc(root, "checkout", "-qb", "pr2");
+    gitc(root, "add", "-A");
+    gitc(root, "commit", "-qm", "0003");
+    gitc(root, "checkout", "-q", "main");
+    gitc(root, "merge", "-q", "--no-ff", "pr2", "-m", "Merge pull request #2 from t/pr2");
+    const rep = run(root, "report.ts");
+    const b1 = dataIteration(root, "0001-fixture");
+    const b2 = dataIteration(root, "0002-fixture");
+    const b3 = dataIteration(root, "0003-fixture");
+    expect(
+      "baseline chain follows merge order, then number within a merge",
+      rep.ok && b1?.baseline === null && b2?.baseline === "0001-fixture" && b3?.baseline === "0002-fixture" && b1?.pr === 1 && b3?.pr === 2,
+      `${rep.output}${JSON.stringify([b1, b2, b3])}`,
+    );
+    // Two concurrent branches off main: each sees 0003 as its baseline,
+    // regardless of directory number.
+    gitc(root, "checkout", "-qb", "pr-a");
+    addIteration(root, "0005-fixture", SCORES_0002);
+    gitc(root, "add", "-A");
+    gitc(root, "commit", "-qm", "0005");
+    gitc(root, "checkout", "-q", "main");
+    gitc(root, "checkout", "-qb", "pr-b");
+    addIteration(root, "0004-fixture", SCORES_0002);
+    gitc(root, "add", "-A");
+    gitc(root, "commit", "-qm", "0004");
+    const repB = run(root, "report.ts");
+    const b4 = dataIteration(root, "0004-fixture");
+    expect(
+      "open iteration on a branch baselines on the last iteration at the merge base",
+      repB.ok && b4?.baseline === "0003-fixture" && b4?.status === "open" && dataIteration(root, "0005-fixture") === undefined,
+      `${repB.output}${JSON.stringify(b4)}`,
+    );
+    gitc(root, "checkout", "-q", "pr-a");
+    const repA = run(root, "report.ts");
+    expect(
+      "the concurrent branch sees the same baseline",
+      repA.ok && dataIteration(root, "0005-fixture")?.baseline === "0003-fixture",
+      repA.output,
+    );
+    // Land pr-a, then pr-b: 0004 (merged later) baselines on 0005.
+    gitc(root, "checkout", "-q", "main");
+    gitc(root, "merge", "-q", "--no-ff", "pr-a", "-m", "Merge pull request #3 from t/pr-a");
+    gitc(root, "merge", "-q", "--no-ff", "pr-b", "-m", "Merge pull request #4 from t/pr-b");
+    const repM = run(root, "report.ts");
+    expect(
+      "after both merge, baselines follow merge order not number",
+      repM.ok && dataIteration(root, "0005-fixture")?.baseline === "0003-fixture" && dataIteration(root, "0004-fixture")?.baseline === "0005-fixture",
+      repM.output,
     );
   }
 
@@ -534,8 +593,8 @@ try {
     const root = makeTree();
     roots.push(root);
     write(root, "cockpit/data.js", "window.__TEDDY_DATA__ = { stale: true };\n");
-    const check = run(root, "cockpit-report.ts", "--check");
-    const rep = run(root, "cockpit-report.ts");
+    const check = run(root, "report.ts", "--check");
+    const rep = run(root, "report.ts");
     expect(
       "stale data.js is ignored by --check and overwritten by generation",
       check.ok && rep.ok && !readText(root, "cockpit/data.js").includes("stale"),
@@ -552,30 +611,27 @@ try {
     expect("accepted ADR with merge trace passes gate", ms.ok, ms.output);
   }
 
-  // I — --fix resolves status drift and must exit clean, not report
-  // the pre-fix failures.
+  // J1 — an iteration on the trunk without a merge commit (squash/rebase or
+  // direct commit) cannot be closed: rejected, on main and on branches off it.
   {
     const root = makeTree();
     roots.push(root);
-    acceptViaMerge(root, false); // merged, but manifest still says proposed
-    const first = run(root, "manifest-sync.ts", "--fix");
-    expect("manifest-sync --fix syncs drift and exits 0", first.ok, first.output);
-    const second = run(root, "manifest-sync.ts");
-    expect("manifest-sync passes after --fix", second.ok, second.output);
-  }
-
-  // J1 — legacy 'status' in the registry: closure is derived, never stored.
-  {
-    const root = makeTree();
-    roots.push(root);
-    const entries = JSON.parse(readText(root, "manifest-of-iterations.json"));
-    entries.iterations[0].status = "closed";
-    write(root, "manifest-of-iterations.json", `${JSON.stringify(entries, null, 2)}\n`);
+    gitc(root, "checkout", "-q", "main");
+    addIteration(root, "0002-fixture", SCORES);
+    gitc(root, "add", "-A");
+    gitc(root, "commit", "-qm", "0002 committed straight to main");
     const sc = run(root, "scores-check.ts");
     expect(
-      "legacy registry status field is rejected",
-      !sc.ok && sc.output.includes("legacy field 'status'"),
+      "iteration on the trunk without a merge trace is rejected",
+      !sc.ok && sc.output.includes("squash/rebase"),
       sc.output,
+    );
+    gitc(root, "checkout", "-qb", "feat");
+    const onBranch = run(root, "scores-check.ts");
+    expect(
+      "on a branch off that trunk it is still rejected (it is at the merge base)",
+      !onBranch.ok && onBranch.output.includes("squash/rebase"),
+      onBranch.output,
     );
   }
 
@@ -586,7 +642,7 @@ try {
     roots.push(root);
     mergeIteration(root, "0001-fixture", "close-1", 10);
     const sc = run(root, "scores-check.ts");
-    const rep = run(root, "cockpit-report.ts");
+    const rep = run(root, "report.ts");
     expect("merged iteration passes scores-check", sc.ok, sc.output);
     const it = dataIteration(root, "0001-fixture");
     expect(
@@ -596,28 +652,11 @@ try {
     );
     // A later PR touching the directory must not steal the landing PR.
     mergeIteration(root, "0001-fixture", "touch-1", 12);
-    const again = run(root, "cockpit-report.ts");
+    const again = run(root, "report.ts");
     expect(
       "derived PR is the oldest merge touching the iteration, not the latest",
       again.ok && dataIteration(root, "0001-fixture")?.pr === 10,
       again.output,
-    );
-  }
-
-  // J3 — out-of-order: the second iteration merges while its baseline never
-  // did (direct commit) — the baseline chain must reject it.
-  {
-    const root = makeTree();
-    roots.push(root);
-    addIteration0002(root, SCORES_0002);
-    gitc(root, "add", "-A");
-    gitc(root, "commit", "-qm", "scaffold 0002");
-    mergeIteration(root, "0002-fixture", "close-2", 11);
-    const sc = run(root, "scores-check.ts");
-    expect(
-      "iteration merged before its baseline is rejected",
-      !sc.ok && sc.output.includes("out-of-order"),
-      sc.output,
     );
   }
 
@@ -627,9 +666,6 @@ try {
     const root = makeTree();
     roots.push(root);
     write(root, "adr/0001-fixture.md", ADR_ACCEPTED);
-    const m = JSON.parse(readText(root, "manifest.json"));
-    m.adrs["0001-fixture"].status = "accepted";
-    write(root, "manifest.json", `${JSON.stringify(m, null, 2)}\n`);
     gitc(root, "add", "-A");
     gitc(root, "commit", "-qm", "accept on branch");
     const ms = runEnv(root, { GITHUB_EVENT_NAME: "pull_request" }, "manifest-sync.ts");
@@ -665,21 +701,11 @@ try {
         "approved_by: someone\nrubric_refs: [adr-traceability]",
       ),
     );
-    const m = JSON.parse(readText(root, "manifest.json"));
-    (m.adrs["0001-fixture"] as Record<string, unknown>).approved_by = "someone";
-    write(root, "manifest.json", `${JSON.stringify(m, null, 2)}\n`);
-    write(
-      root,
-      "iterations/0001-fixture/scores.json",
-      SCORES.replace(
-        '"deterministic_gate": "pass"',
-        '"approved_by": "someone",\n  "deterministic_gate": "pass"',
-      ),
-    );
+    write(root, "iterations/0001-fixture/scores.json", SCORES.replace('"criteria"', '"approved_by": "someone",\n  "criteria"'));
     const ms = run(root, "manifest-sync.ts");
     const sc = run(root, "scores-check.ts");
     expect(
-      "legacy approved_by in ADR/manifest is rejected",
+      "legacy approved_by in ADR is rejected",
       !ms.ok && ms.output.includes("legacy"),
       ms.output,
     );
@@ -713,7 +739,7 @@ try {
     const root = makeTree();
     roots.push(root);
     write(root, "package.json", pkgWith({}));
-    write(root, "checks/test.ts", "");
+    write(root, "checks/test.ts", ""); // a host check named test.ts must not be discovered as a test file
     const skip = run(root, "test.ts", "--json");
     expect("test: no runner and no test files skips", skip.ok && skip.output.includes('"verdict":"skip"'), skip.output);
     write(root, "src/sum.test.mjs", 'import test from "node:test"; test("ok", () => {});\n');
@@ -835,4 +861,5 @@ try {
 }
 
 console.log(`\nselftest: ${passed} passed, ${failed} failed`);
+if (json) console.log(JSON.stringify({ id: "selftest", verdict: failed > 0 ? "fail" : "pass", signals: {} }));
 process.exit(failed > 0 ? 1 : 0);

@@ -3,6 +3,7 @@ id: 0001
 status: accepted
 supersedes: null
 superseded_by: null
+assertions: [teddy:manifest-sync, teddy:scores-check, checks/selftest.ts]
 rubric_refs: [adr-traceability]
 ---
 

@@ -2,7 +2,7 @@
 // local `tsc --noEmit` when `typescript` is declared in package.json. Not
 // declared → skip with a note; declared but not installed → fail closed.
 // Usage: node checks/typecheck.ts [--json] [root]
-import { declaredDeps, emitResult, localBin, runTool } from "./lib.ts";
+import { declaredDeps, emitResult, localBin, runTool } from "../lib.ts";
 
 const args = process.argv.slice(2);
 const json = args.includes("--json");

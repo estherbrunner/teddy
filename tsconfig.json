@@ -1,12 +1,20 @@
 {
+  // Type-checks everything Teddy owns (src/, its host check, its config).
+  // Emit is configured in tsconfig.build.json; the cockpit (DOM) in
+  // tsconfig.cockpit.json.
   "compilerOptions": {
     "target": "ES2022",
-    "module": "none",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "types": ["node"],
     "strict": true,
-    "noEmitOnError": true,
+    "erasableSyntaxOnly": true,
+    "rewriteRelativeImportExtensions": true,
+    "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "types": []
+    "noEmit": true
   },
-  "include": ["cockpit/main.ts"]
+  "include": ["src/**/*.ts", "checks/**/*.ts", "teddy.config.ts"],
+  "exclude": ["src/cockpit"]
 }

@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: 26
       - run: npm ci
-      # Deterministic hard gate: selftest (the checks themselves), traceability,
-      # scores/baseline gate, cockpit data generation — then typecheck and build.
+      # Deterministic hard gate: lint, typecheck, selftest (the checks
+      # themselves), then `teddy check` from source and from the built
+      # package (adr/0007).
       - run: npm test
-      - run: npm run build

@@ -2,9 +2,10 @@
 
 **T**ypeScript **E**val-**D**riven **D**evelopment + **Y**.
 
-A self-hosted, eval-driven development harness for TypeScript projects. Teddy codifies
-project behavior in three linked layers and enforces the links mechanically — and it is
-self-hosted: its first project is itself, including its own cockpit dashboard.
+An eval-driven development harness for TypeScript projects, shipped as a package with a
+`teddy` CLI (adr/0007). Teddy codifies project behavior in three linked layers and
+enforces the links mechanically — and it is self-hosted: its first host is itself,
+including its own cockpit dashboard.
 
 ## The three layers
 
@@ -12,16 +13,19 @@ self-hosted: its first project is itself, including its own cockpit dashboard.
    (`proposed → accepted → deprecated | superseded`). Since adr/0003 the approval **is the
    merge**: status transitions land inside PRs and GitHub records who merged; nothing under
    `adr/` is ever auto-merged.
-2. **Deterministic assertions** (`checks/`) — reproducible checks tied to specific ADRs,
-   plus the lint gate. Binary pass/fail. Hard gate: they must pass regardless of any score.
-3. **Rubric criteria** (`rubrics/rubric.ts`) — weighted, human-defined criteria. Each
+2. **Deterministic assertions** — Teddy's built-in checks (`teddy:lint`, `teddy:test`, …)
+   and a host's own `checks/*.ts`, tied to specific ADRs. Binary pass/fail. Hard gate: they
+   must pass regardless of any score.
+3. **Rubric criteria** (`teddy.config.ts`, or Teddy's default rubric) — weighted,
+   human-defined criteria. Each
    carries deterministic evidence — *gates* (binary, hard) and *signals* (numeric,
    thresholded) — and, where a judgment remains, *anchors* an LLM judge scores against
    (adr/0006). Judge/human disagreements resolve into ADR amendments or promoted
    assertions, shrinking the judge's surface over time.
 
-`manifest.json` is the single source of truth linking `adr → assertions → criteria`.
-Orphaned ADRs *and* orphaned assertions are failures.
+ADR frontmatter (`assertions:`, `rubric_refs:`) is the single source linking
+`adr → assertions → criteria` (adr/0007). Orphaned ADRs *and* orphaned host checks are
+failures.
 
 ## The loop
 
@@ -33,10 +37,11 @@ ticket → branch → implement → deterministic gates (hard) → rubric-judge 
         closure, nothing is written (adr/0005) → new baseline
 ```
 
-Per iteration (`iterations/NNNN-slug/`): a `ticket.md` and a `scores.json` snapshot.
-The PR that landed it is read off the merge commit, never stored (adr/0005).
-`null` scores mean "not exercised this iteration" and are excluded from the weighted
-average. `overall` is precomputed — the cockpit stays a static reader.
+Per iteration (`iterations/NNNN-slug/`): a `ticket.md` and a `scores.json` of
+`timestamp` + `criteria`. Everything else — closure, the PR that landed it, the baseline
+it is compared against — is derived from the directory and git, never stored
+(adr/0005, adr/0007). `null` scores mean "not exercised this iteration" and are excluded
+from the weighted average.
 
 ```
 overall = Σ(weightᵢ × scoreᵢ) / Σ(weightᵢ)   over non-null criteria
@@ -54,42 +59,63 @@ every open iteration's gates and signals are re-run and must agree with what
 skipped, or when it has no evidence and cites no file. Whether 0.7 should have
 been 0.5 is the reviewer's call at merge.
 
-## Quickstart
+## Using Teddy in a project
 
-Requires Node ≥ 23.6 (checks run on Node's native type-stripping; no build step for checks).
+Requires Node ≥ 23.6 (native type stripping) and TypeScript. Teddy is installed from
+git until its defaults have been proven on internal projects (adr/0007):
+
+```sh
+npm install -D github:estherbrunner/teddy#main   # pin a tag or commit in real use
+npx teddy check                                   # the CI gate
+npx teddy report && open cockpit/index.html       # the dashboard (cockpit/ is a build output)
+npx teddy lint | typecheck | test | coverage      # the adapters (--json for the check contract)
+```
+
+A host needs only `adr/` and `iterations/`; `checks/` for its own checks and
+`teddy.config.ts` for overrides are optional:
+
+```ts
+import type { Config } from "teddy";
+export default {
+  dirs: { adr: "docs/decisions" },     // defaults: adr, iterations, checks
+  pattern: /^\d{4}-[a-z0-9-]+$/,       // ADR + iteration directory naming
+  main: "main",                        // trunk branch
+  src: ["src/**"],                     // code under judgment
+  rubric: { version: 2, criteria: [/* … */] },   // omit for Teddy's default rubric
+} satisfies Config;
+```
+
+The config is data: it may import nothing but types. ADRs link their assertions in
+frontmatter — `assertions: [checks/my-check.ts, teddy:lint]`.
+
+## Developing Teddy
 
 ```sh
 npm install
-npm test          # lint + typecheck + selftest + all deterministic gates
-npm run lint      # the lint gate alone (detects the declared linter, adr/0004)
-npm run typecheck # the typecheck gate (detects typescript → local tsc)
-npm run report    # generate cockpit/data.js from manifests + scores + merge history
-npm run build     # cockpit/data.js + tsc → cockpit/main.js
-open cockpit/index.html
+npm test          # lint + typecheck + selftest + teddy check (from source, then from dist/)
+npm run check     # node src/cli.ts check
+npm run report    # build, then write cockpit/ for this repository
 ```
 
-`cockpit/data.js` and `cockpit/main.js` are build outputs and not committed
-(adr/0005); `main` is published to GitHub Pages by `.github/workflows/pages.yml`.
+`dist/` and `cockpit/` are build outputs (adr/0005, adr/0007); `main` is published to
+GitHub Pages by `.github/workflows/pages.yml`.
 
 ## Repo tour
 
 ```
-adr/                        decision records (merge = approval, adr/0003)
-rubrics/rubric.ts           typed rubric: criteria with gates, signals, judge, anchors
-checks/                     deterministic assertions + adapters (--json contract, adr/0006)
-  manifest-sync.ts          traceability gate + merge-as-approval lifecycle gate
-  scores-check.ts           scores schema, evidence verification, per-criterion baseline gate
-  cockpit-report.ts         generates cockpit/data.js (closure derived from git, adr/0005)
-  lint.ts                   gate: the linter declared in package.json (adr/0004)
-  typecheck.ts              gate: tsc --noEmit when typescript is declared
-  test.ts                   gate: vitest / jest / mocha, or node --test over test files
-  coverage.ts               signals: total + changed_lines from the runner's coverage output
-  selftest.ts               verifies the checks themselves (fail + pass paths)
-  lib.ts                    shared types, rubric loader, check runner, aggregation
-manifest.json               SSOT: adr → assertions → criteria
-manifest-of-iterations.json iteration registry (id, ticket, scores, baseline — no status)
+adr/                        decision records (merge = approval, adr/0003); frontmatter carries links
 iterations/NNNN-slug/       ticket.md + scores.json per iteration
-cockpit/                    static dashboard (vanilla TS, no framework, no server)
+teddy.config.ts             Teddy's own config: its rubric (gates, signals, judge, anchors)
+checks/selftest.ts          Teddy's own host check: verifies the built-in checks (fail + pass paths)
+src/
+  cli.ts                    teddy <command> — check | report | <check-id>
+  lib.ts                    Config/Rubric types, config loader, derived iterations, git, check runner
+  checks/                   built-in checks (--json contract, adr/0006)
+    manifest-sync.ts        traceability + merge-as-approval lifecycle gate, config guard
+    scores-check.ts         scores schema, evidence verification, per-criterion baseline gate
+    lint.ts / typecheck.ts / test.ts / coverage.ts   adapters over the tools a host declares
+  commands/report.ts        writes cockpit/ (data.js + dashboard) — closure, PR, baseline from git
+  cockpit/                  the static dashboard (index.html + main.ts)
 skills/                     agent skills: adr-author, rubric-judge, manifest-sync,
                             iteration-scaffold, cockpit-report
 .github/                    CI gate + pages publish + CODEOWNERS
@@ -119,8 +145,9 @@ accounts; agents must never merge.
 
 ## Status
 
-ADRs 0001–0006 accepted; iterations 0001–0008 closed. Iteration 0008
-(adr/0006) moved the rubric to a typed TS module with gates, signals and
-anchors, made `scores.json` carry verifiable evidence, and added the
-`typecheck`, `test` and `coverage` adapters. Next: `checks/judge.ts`
-(local LLM judge), then the host-project criteria.
+ADRs 0001–0007 accepted; iterations 0001–0009 closed. Iteration 0009
+(adr/0007) made Teddy a git-installable package with a `teddy` CLI, moved
+the rubric into `teddy.config.ts`, and deleted both manifests: iterations,
+their closure, PR and baseline are derived from the directory and git; ADR
+links live in frontmatter. Next: `teddy judge` (local LLM judge), then
+`teddy init` / `teddy new`, then the first internal host.

@@ -3,19 +3,37 @@
   "version": "0.1.0",
   "description": "TypeScript Eval-Driven Development \u2014 a self-hosted eval-driven development harness.",
   "type": "module",
-  "private": true,
   "scripts": {
-    "lint": "node checks/lint.ts",
-    "typecheck": "node checks/typecheck.ts",
+    "check": "node src/cli.ts check",
+    "report": "npm run build && node src/cli.ts report",
+    "lint": "node src/cli.ts lint",
+    "typecheck": "node src/cli.ts typecheck",
     "selftest": "node checks/selftest.ts",
-    "check": "node checks/manifest-sync.ts && node checks/scores-check.ts && node checks/cockpit-report.ts --check",
-    "report": "node checks/cockpit-report.ts",
-    "build": "node checks/cockpit-report.ts && tsc",
-    "test": "npm run lint && npm run typecheck && npm run selftest && npm run check"
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.cockpit.json && node --input-type=module -e \"import{cpSync}from'node:fs';cpSync('src/cockpit/index.html','dist/cockpit/index.html')\"",
+    "prepare": "npm run build",
+    "test": "npm run lint && npm run typecheck && npm run selftest && npm run check && npm run build && node dist/cli.js check"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
     "@types/node": "^24.0.0",
     "typescript": "^5.9.2"
+  },
+  "bin": {
+    "teddy": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/lib.d.ts",
+      "default": "./dist/lib.js"
+    }
+  },
+  "types": "dist/lib.d.ts",
+  "files": [
+    "dist",
+    "skills",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=23.6"
   }
 }

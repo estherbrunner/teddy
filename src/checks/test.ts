@@ -6,7 +6,7 @@
 // Usage: node checks/test.ts [--json] [root]
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { declaredDeps, emitResult, localBin, runTool } from "./lib.ts";
+import { declaredDeps, emitResult, localBin, runTool } from "../lib.ts";
 
 const args = process.argv.slice(2);
 const json = args.includes("--json");

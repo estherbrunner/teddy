@@ -1,7 +1,4 @@
 {
-  "iteration": "0002-cockpit-minimal-scope",
-  "ticket": "0002",
-  "baseline": "0001-teddy-bootstrap",
   "timestamp": "2026-09-11T10:00:00Z",
   "criteria": {
     "adr-traceability": {
@@ -30,7 +27,5 @@
       "gates": {},
       "signals": {}
     }
-  },
-  "overall": 1,
-  "deterministic_gate": "pass"
+  }
 }

@@ -3,6 +3,7 @@ id: 0002
 status: accepted
 supersedes: null
 superseded_by: null
+assertions: [teddy:report]
 rubric_refs: [cockpit-clarity]
 ---
 
