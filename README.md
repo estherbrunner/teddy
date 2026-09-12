@@ -53,7 +53,11 @@ last recorded value; a `judge: "llm"` score may drop by at most the rubric's
 `tolerance`. `overall` is the reported trend, not the gate — aggregates let one
 big gain mask a regression.
 
-The **LLM judge runs locally, never in CI**. CI verifies what can be verified:
+The **LLM judge runs locally, never in CI** (`teddy judge`, iteration 0010: it
+measures the evidence, scores deterministic criteria by rule, and asks the
+configured model to score llm criteria against the anchors with the diff and
+evidence in hand; `--verify` re-judges and rejects inflated claims). CI verifies
+what can be verified:
 every open iteration's gates and signals are re-run and must agree with what
 `scores.json` records; an llm score is capped at 0.5 when its evidence was
 skipped, or when it has no evidence and cites no file. Whether 0.7 should have
@@ -69,6 +73,7 @@ npm install -D github:estherbrunner/teddy#main   # pin a tag or commit in real u
 npx teddy check                                   # the CI gate
 npx teddy report && open cockpit/index.html       # the dashboard (cockpit/ is a build output)
 npx teddy lint | typecheck | test | coverage      # the adapters (--json for the check contract)
+npx teddy judge                                   # score the open iteration (local; ANTHROPIC_API_KEY for llm criteria)
 ```
 
 A host needs only `adr/` and `iterations/`; `checks/` for its own checks and
@@ -115,6 +120,7 @@ src/
     scores-check.ts         scores schema, evidence verification, per-criterion baseline gate
     lint.ts / typecheck.ts / test.ts / coverage.ts   adapters over the tools a host declares
   commands/report.ts        writes cockpit/ (data.js + dashboard) — closure, PR, baseline from git
+  commands/judge.ts         teddy judge: evidence + anchored llm scoring → scores.json (local only)
   cockpit/                  the static dashboard (index.html + main.ts)
 skills/                     agent skills: adr-author, rubric-judge, manifest-sync,
                             iteration-scaffold, cockpit-report
@@ -145,9 +151,8 @@ accounts; agents must never merge.
 
 ## Status
 
-ADRs 0001–0007 accepted; iterations 0001–0009 closed. Iteration 0009
-(adr/0007) made Teddy a git-installable package with a `teddy` CLI, moved
-the rubric into `teddy.config.ts`, and deleted both manifests: iterations,
-their closure, PR and baseline are derived from the directory and git; ADR
-links live in frontmatter. Next: `teddy judge` (local LLM judge), then
-`teddy init` / `teddy new`, then the first internal host.
+ADRs 0001–0007 accepted; iterations 0001–0010 closed. Iteration 0010
+delivered `teddy judge` (adr/0006): the deterministic half and the anchored
+llm half of scoring, local only, writing `scores.json` — its own iteration
+was the first one it scored. Next: `teddy init` / `teddy new`, then the
+first internal host.

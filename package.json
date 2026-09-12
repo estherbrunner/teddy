@@ -11,7 +11,8 @@
     "selftest": "node checks/selftest.ts",
     "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.cockpit.json && node --input-type=module -e \"import{cpSync}from'node:fs';cpSync('src/cockpit/index.html','dist/cockpit/index.html')\"",
     "prepare": "npm run build",
-    "test": "npm run lint && npm run typecheck && npm run selftest && npm run check && npm run build && node dist/cli.js check"
+    "test": "npm run lint && npm run typecheck && npm run selftest && npm run check && npm run build && node dist/cli.js check",
+    "judge": "node src/cli.ts judge"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",

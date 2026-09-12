@@ -5,6 +5,7 @@
 // and baselines are derived from it (adr/0005, adr/0007).
 // Usage: node checks/selftest.ts [--json]
 import { spawnSync } from "node:child_process";
+import { createServer, type Server } from "node:http";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -39,7 +40,7 @@ function runEnv(
   script: string,
   ...args: string[]
 ): SpawnResult {
-  const dir = script === "report.ts" ? commandsDir : checksDir;
+  const dir = script === "report.ts" || script === "judge.ts" ? commandsDir : checksDir;
   const res = spawnSync(process.execPath, [join(dir, script), ...args, root], {
     encoding: "utf8",
     // Pin the event context: fixtures must not inherit CI's pull_request
@@ -232,6 +233,52 @@ function fakeBin(root: string, name: string, code: number): void {
   chmodSync(join(root, "node_modules/.bin", name), 0o755);
 }
 
+// A fake judge endpoint (Anthropic Messages API shape): replies with whatever
+// verdicts the current case set. The judge must never see the real network.
+// Where the environment forbids listening (sandboxes), the same verdicts are
+// served through the judge's file:// replay seam instead.
+let fakeVerdicts: unknown[] = [];
+let fakeRequests = 0;
+const replayFile = join(tmpdir(), `teddy-selftest-judge-${process.pid}.json`);
+function setVerdicts(v: unknown[]): void {
+  fakeVerdicts = v;
+  writeFileSync(replayFile, JSON.stringify({
+    stop_reason: "end_turn",
+    content: [{ type: "text", text: JSON.stringify({ criteria: v }) }],
+  }));
+}
+function startFakeJudge(): Promise<{ server: Server | null; url: string }> {
+  return new Promise((resolve) => {
+    const server = createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+      });
+      req.on("end", () => {
+        fakeRequests++;
+        const ok = req.headers["x-api-key"] === "test-key" && body.includes('"json_schema"');
+        res.writeHead(ok ? 200 : 400, { "content-type": "application/json" });
+        res.end(
+          ok
+            ? JSON.stringify({
+                stop_reason: "end_turn",
+                content: [{ type: "text", text: JSON.stringify({ criteria: fakeVerdicts }) }],
+              })
+            : JSON.stringify({ error: "bad request" }),
+        );
+      });
+    });
+    server.on("error", () => {
+      console.log("  --  fake judge: cannot listen here — using the file:// replay seam");
+      resolve({ server: null, url: `file://${replayFile}` });
+    });
+    server.listen(0, "127.0.0.1", () => {
+      const addr = server.address() as { port: number };
+      resolve({ server, url: `http://127.0.0.1:${addr.port}/v1/messages` });
+    });
+  });
+}
+
 let passed = 0;
 let failed = 0;
 
@@ -246,6 +293,10 @@ function expect(name: string, cond: boolean, detail: string): void {
 }
 
 const roots: string[] = [];
+const fake = await startFakeJudge();
+const usingHttp = fake.server !== null;
+const JUDGE_ENV = { ANTHROPIC_API_KEY: "test-key", TEDDY_JUDGE_URL: fake.url, TEDDY_JUDGE_MODEL: "fake-model" };
+const NO_KEY_ENV = { ANTHROPIC_API_KEY: "", TEDDY_JUDGE_URL: fake.url };
 
 try {
   // A — valid tree: every check passes, report --check is stable across runs.
@@ -856,7 +907,79 @@ try {
       lint.output,
     );
   }
+  // K2 — teddy judge (adr/0006): measures evidence, scores judge-none by
+  // rule, leaves llm criteria null without a credential, and passes the gate.
+  {
+    const root = makeTree();
+    roots.push(root);
+    rmSync(join(root, "iterations/0001-fixture/scores.json"));
+    const j = runEnv(root, NO_KEY_ENV, "judge.ts");
+    const written = JSON.parse(readText(root, "iterations/0001-fixture/scores.json"));
+    const sc = run(root, "scores-check.ts");
+    expect(
+      "judge: without a credential writes deterministic scores and null llm scores",
+      j.ok && j.output.includes("no ANTHROPIC_API_KEY") &&
+        written.criteria["adr-traceability"].score === 1 && written.criteria["adr-traceability"].gates["dummy-check"] === "pass" &&
+        written.criteria["cockpit-clarity"].score === null && !("overall" in written),
+      `${j.output}${JSON.stringify(written)}`,
+    );
+    expect("judge: its scores.json passes scores-check", sc.ok, sc.output);
+    const v = runEnv(root, NO_KEY_ENV, "judge.ts", "--verify");
+    expect("judge --verify without a credential fails closed", !v.ok && v.output.includes("needs a credential"), v.output);
+  }
+
+  // K3 — with a (fake) model: scores against anchors, applies the evidence
+  // bounds, honours "not exercised", and --verify enforces tolerance.
+  {
+    const root = makeTree();
+    roots.push(root);
+    setVerdicts([{ id: "cockpit-clarity", exercised: true, score: 0.9, rationale: "clear trend in cockpit/main.ts" }]);
+    const before = fakeRequests;
+    const j = runEnv(root, JUDGE_ENV, "judge.ts");
+    const written = JSON.parse(readText(root, "iterations/0001-fixture/scores.json"));
+    expect(
+      "judge: llm criterion scored from the model's structured verdict",
+      j.ok && (!usingHttp || fakeRequests === before + 1) && written.criteria["cockpit-clarity"].score === 0.9 && written.criteria["cockpit-clarity"].rationale.includes("cockpit/main.ts"),
+      `${j.output}${JSON.stringify(written)}`,
+    );
+    setVerdicts([{ id: "cockpit-clarity", exercised: true, score: 0.9, rationale: "looks great" }]);
+    const capped = runEnv(root, JUDGE_ENV, "judge.ts", "--dry-run");
+    expect(
+      "judge: score above 0.5 with no evidence and no cited file is capped",
+      capped.ok && capped.output.includes('"score": 0.5') && capped.output.includes("capped at 0.5"),
+      capped.output,
+    );
+    setVerdicts([{ id: "cockpit-clarity", exercised: false, score: null, rationale: "the diff does not touch the dashboard" }]);
+    const skipped = runEnv(root, JUDGE_ENV, "judge.ts", "--dry-run");
+    expect(
+      "judge: not-exercised verdict becomes null",
+      skipped.ok && skipped.output.includes('"score": null') && skipped.output.includes("not exercised — the diff"),
+      skipped.output,
+    );
+    // --verify: recorded 0.9; fresh 0.85 is within tolerance 0.1, fresh 0.7 is not.
+    setVerdicts([{ id: "cockpit-clarity", exercised: true, score: 0.85, rationale: "see cockpit/main.ts" }]);
+    const within = runEnv(root, JUDGE_ENV, "judge.ts", "--verify");
+    expect("judge --verify: recorded within tolerance of a fresh judgment passes", within.ok, within.output);
+    setVerdicts([{ id: "cockpit-clarity", exercised: true, score: 0.7, rationale: "see cockpit/main.ts" }]);
+    const beyond = runEnv(root, JUDGE_ENV, "judge.ts", "--verify");
+    expect(
+      "judge --verify: recorded score inflated beyond tolerance is rejected",
+      !beyond.ok && beyond.output.includes("exceeds fresh judgment"),
+      beyond.output,
+    );
+    // A failing gate aborts the judge before any model call.
+    write(root, "checks/dummy-check.ts", "process.exit(1);\n");
+    const before2 = fakeRequests;
+    const aborted = runEnv(root, JUDGE_ENV, "judge.ts", "--dry-run");
+    expect(
+      "judge: a failing gate aborts before judging",
+      !aborted.ok && aborted.output.includes("gate 'dummy-check' fails") && (!usingHttp || fakeRequests === before2),
+      aborted.output,
+    );
+  }
 } finally {
+  fake.server?.close();
+  rmSync(replayFile, { force: true });
   for (const root of roots) rmSync(root, { recursive: true, force: true });
 }
 
