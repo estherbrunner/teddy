@@ -6,18 +6,29 @@
   "criteria": {
     "adr-traceability": {
       "score": 1,
-      "judge": "manifest-sync",
-      "rationale": "checks/manifest-sync.ts passes: both accepted ADRs resolve to linked assertions/criteria, the amendment adds no unlinked artifacts, scores-check remains the promoted assertion for adr/0001"
+      "judge": "none",
+      "rationale": "checks/manifest-sync.ts passes: both accepted ADRs resolve to linked assertions/criteria, the amendment adds no unlinked artifacts, scores-check remains the promoted assertion for adr/0001",
+      "gates": {
+        "manifest-sync": "pass",
+        "selftest": "pass",
+        "typecheck": "pass",
+        "lint": "pass"
+      },
+      "signals": {}
     },
     "cockpit-clarity": {
       "score": null,
       "judge": "llm",
-      "rationale": "not exercised — no cockpit change this iteration"
+      "rationale": "not exercised — no cockpit change this iteration",
+      "gates": {},
+      "signals": {}
     },
     "loop-closure": {
       "score": 1,
       "judge": "llm",
-      "rationale": "the gate-comparability defect flagged during bootstrap review (and concurred by the human) resolved within one iteration into both halves of the fork: adr/0001 amendment section 'paired per-criterion baseline gate' AND promotion into checks/scores-check.ts (chain-walk) with selftest cases F1/F2 proving the old gate's escape now passes and compensated regressions still fail. Structural evidence, checkable in the diff. If human review downgrades this score, that disagreement itself becomes the next loop-closure datum"
+      "rationale": "the gate-comparability defect flagged during bootstrap review (and concurred by the human) resolved within one iteration into both halves of the fork: adr/0001 amendment section 'paired per-criterion baseline gate' AND promotion into checks/scores-check.ts (chain-walk) with selftest cases F1/F2 proving the old gate's escape now passes and compensated regressions still fail. Structural evidence, checkable in the diff. If human review downgrades this score, that disagreement itself becomes the next loop-closure datum",
+      "gates": {},
+      "signals": {}
     }
   },
   "overall": 1,

@@ -6,18 +6,29 @@
   "criteria": {
     "adr-traceability": {
       "score": 1,
-      "judge": "manifest-sync",
-      "rationale": "checks/manifest-sync.ts passes: 5 ADRs resolve with manifest↔rubric.yaml parity and no orphans (5 linked assertions after checks/scribe.ts is removed); adr/0005 links cockpit-report, scores-check, and selftest. Both directions verified by the 27-case selftest: derived status (open / merged→closed), out-of-order merge rejected, legacy registry 'status' rejected, PR-run deferral of a pending ADR transition, and --check writing nothing"
+      "judge": "none",
+      "rationale": "checks/manifest-sync.ts passes: 5 ADRs resolve with manifest↔rubric.yaml parity and no orphans (5 linked assertions after checks/scribe.ts is removed); adr/0005 links cockpit-report, scores-check, and selftest. Both directions verified by the 27-case selftest: derived status (open / merged→closed), out-of-order merge rejected, legacy registry 'status' rejected, PR-run deferral of a pending ADR transition, and --check writing nothing",
+      "gates": {
+        "manifest-sync": "pass",
+        "selftest": "pass",
+        "typecheck": "pass",
+        "lint": "pass"
+      },
+      "signals": {}
     },
     "cockpit-clarity": {
       "score": null,
       "judge": "llm",
-      "rationale": "not exercised — cockpit/main.ts is untouched; data.js keeps the same shape, only its provenance changes"
+      "rationale": "not exercised — cockpit/main.ts is untouched; data.js keeps the same shape, only its provenance changes",
+      "gates": {},
+      "signals": {}
     },
     "loop-closure": {
       "score": null,
       "judge": "llm",
-      "rationale": "not exercised — adr/0005 is a directed design decision following the architecture review, not a judge/human disagreement"
+      "rationale": "not exercised — adr/0005 is a directed design decision following the architecture review, not a judge/human disagreement",
+      "gates": {},
+      "signals": {}
     }
   },
   "overall": 1,

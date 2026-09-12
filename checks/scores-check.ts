@@ -1,6 +1,8 @@
 // Deterministic gate over iterations/*/scores.json + tickets + the iteration
-// registry: schema integrity, weighted-aggregation correctness, and the
-// per-criterion baseline gate (score must not decrease — fails closed).
+// registry: schema integrity, weighted-aggregation correctness, evidence
+// verification for open iterations (adr/0006: gates and signals are re-run
+// and must agree with what was recorded; llm scores are bounded by their
+// evidence), and the per-criterion baseline gate (fails closed).
 // Usage: node checks/scores-check.ts [root]
 // Exit 0 = consistent, 1 = failures listed below.
 import { basename, dirname, join } from "node:path";
@@ -9,11 +11,16 @@ import {
   exists,
   isGitRepo,
   iterationStatus,
+  loadRubric,
   parseFrontmatter,
-  parseRubric,
   readJson,
   readText,
+  RUBRIC_PATH,
+  runCheck,
   weightedOverall,
+  type CheckResult,
+  type LoadedRubric,
+  type RubricCriterion,
 } from "./lib.ts";
 
 const root = process.argv[2] ?? process.cwd();
@@ -22,9 +29,9 @@ function fail(msg: string): void {
   fails.push(msg);
 }
 
-let rubric: ReturnType<typeof parseRubric>;
+let rubric: LoadedRubric;
 try {
-  rubric = parseRubric(readText(root, "rubrics/rubric.yaml"));
+  rubric = await loadRubric(root);
 } catch (e) {
   console.error(`FAIL: ${(e as Error).message}`);
   process.exit(1);
@@ -41,6 +48,8 @@ interface ScoreEntry {
   score: number | null;
   judge: string;
   rationale: string;
+  gates: Record<string, string>; // gate id → pass | skip (adr/0006 evidence)
+  signals: Record<string, number>; // "check.metric" → value
 }
 
 interface Scores {
@@ -147,22 +156,67 @@ for (const entry of registry.iterations) {
   if (keys.length === 0) fail(`${rel}: no criteria recorded`);
   let exercised = 0;
   for (const [id, c] of Object.entries(scores.criteria ?? {})) {
-    if (!rubric.criteria[id]) {
-      fail(`${rel}: unknown criterion '${id}' (not in rubric.yaml)`);
+    const crit = rubric.byId[id];
+    if (!crit) {
+      fail(`${rel}: unknown criterion '${id}' (not in ${RUBRIC_PATH})`);
       continue;
     }
     if (c.score !== null && (typeof c.score !== "number" || c.score < 0 || c.score > 1)) {
       fail(`${rel}: criterion '${id}' score must be null or a number in [0, 1]`);
     }
     if (c.score !== null) exercised++;
-    if (c.judge !== rubric.criteria[id].judge) {
-      fail(
-        `${rel}: criterion '${id}' judge '${c.judge}' does not match rubric.yaml judge ` +
-          `'${rubric.criteria[id].judge}'`,
-      );
+    if (c.judge !== crit.judge) {
+      fail(`${rel}: criterion '${id}' judge '${c.judge}' does not match ${RUBRIC_PATH} judge '${crit.judge}'`);
     }
     if (typeof c.rationale !== "string" || c.rationale.length === 0) {
       fail(`${rel}: criterion '${id}' missing rationale`);
+    }
+    if (!c.gates || typeof c.gates !== "object" || !c.signals || typeof c.signals !== "object") {
+      fail(`${rel}: criterion '${id}' must record evidence: 'gates' and 'signals' objects (adr/0006)`);
+      continue;
+    }
+    // Recorded evidence must match the rubric's declaration for the criterion.
+    for (const g of crit.gates) {
+      if (c.gates[g] !== "pass" && c.gates[g] !== "skip") {
+        fail(`${rel}: criterion '${id}' gate '${g}' must be recorded as pass | skip`);
+      }
+    }
+    for (const g of Object.keys(c.gates)) {
+      if (!crit.gates.includes(g)) fail(`${rel}: criterion '${id}' records gate '${g}' the rubric does not declare`);
+    }
+    for (const sig of crit.signals) {
+      const key = `${sig.check}.${sig.metric}`;
+      const v = c.signals[key];
+      if (v === undefined) continue; // unmeasured — bounded below
+      if (typeof v !== "number") fail(`${rel}: criterion '${id}' signal '${key}' must be a number`);
+      else if (sig.min !== undefined && v < sig.min) {
+        fail(`${rel}: criterion '${id}' signal '${key}' ${v} < min ${sig.min} (threshold is a gate)`);
+      } else if (sig.max !== undefined && v > sig.max) {
+        fail(`${rel}: criterion '${id}' signal '${key}' ${v} > max ${sig.max} (threshold is a gate)`);
+      }
+    }
+    for (const key of Object.keys(c.signals)) {
+      if (!crit.signals.some((sg) => `${sg.check}.${sg.metric}` === key)) {
+        fail(`${rel}: criterion '${id}' records signal '${key}' the rubric does not declare`);
+      }
+    }
+    // Evidence bounds (adr/0006).
+    const skipped = crit.gates.some((g) => c.gates[g] === "skip") ||
+      crit.signals.some((sg) => c.signals[`${sg.check}.${sg.metric}`] === undefined);
+    if (crit.judge === "none") {
+      if (c.score !== null && skipped) {
+        fail(`${rel}: criterion '${id}' (judge none) has skipped evidence — score must be null, not ${c.score}`);
+      } else if (c.score !== null && c.score !== 1) {
+        fail(`${rel}: criterion '${id}' (judge none) score must be 1 when its evidence passed, got ${c.score}`);
+      } else if (c.score === null && !skipped && (crit.gates.length > 0 || crit.signals.length > 0)) {
+        fail(`${rel}: criterion '${id}' (judge none) has complete passing evidence — score must be 1, not null`);
+      }
+    } else if (c.score !== null && c.score > 0.5) {
+      if (skipped) {
+        fail(`${rel}: criterion '${id}' scored ${c.score} with skipped/unmeasured evidence — capped at 0.5 (adr/0006)`);
+      } else if (crit.gates.length === 0 && crit.signals.length === 0 && !/[\w./-]+\.[a-z]{2,5}\b/.test(c.rationale ?? "")) {
+        fail(`${rel}: criterion '${id}' scored ${c.score} with no evidence and a rationale citing no file — capped at 0.5 (adr/0006)`);
+      }
     }
   }
   if (exercised === 0) fail(`${rel}: every criterion is null — nothing was exercised`);
@@ -171,21 +225,70 @@ for (const entry of registry.iterations) {
   if (computed !== null && Math.abs(computed - scores.overall) > 1e-6) {
     fail(
       `${rel}: overall ${scores.overall} != weighted ${Number(computed.toFixed(6))} ` +
-        `(weights from rubric.yaml, non-null criteria only)`,
+        `(weights from ${RUBRIC_PATH}, non-null criteria only)`,
     );
   }
 }
 
-// Baseline gate (adr/0001, amended by iteration 0003): paired per-criterion
-// non-regression. Every non-null criterion must be ≥ its last recorded
-// non-null score anywhere in the baseline chain; criteria exercised for the
-// first time have no prior and pass. `overall` is the reported weighted
-// aggregate — not gated — because iterations exercising different criteria
-// sets are not comparable through it. Fails closed.
+// Evidence verification (adr/0006): for every open iteration — the one(s)
+// under review on this ref — re-run each declared gate and signal against
+// the tree and require the recorded evidence to agree. Closed iterations
+// were verified on their PR run; their tree no longer exists.
+const verifyEvidence = isGitRepo(root);
+const checkCache = new Map<string, CheckResult>();
+function measured(id: string): CheckResult {
+  let r = checkCache.get(id);
+  if (!r) {
+    r = runCheck(root, id);
+    checkCache.set(id, r);
+  }
+  return r;
+}
+if (verifyEvidence) {
+  for (const entry of registry.iterations) {
+    const scores = scoresById.get(entry.id);
+    if (!scores || iterationStatus(root, entry.id) !== "open") continue;
+    for (const [id, c] of Object.entries(scores.criteria)) {
+      const crit: RubricCriterion | undefined = rubric.byId[id];
+      if (!crit || !c.gates || !c.signals) continue;
+      for (const g of crit.gates) {
+        const actual = measured(g).verdict;
+        if (actual === "fail") fail(`${entry.scores}: gate '${g}' fails on this tree (recorded ${c.gates[g]})`);
+        else if (c.gates[g] !== actual) {
+          fail(`${entry.scores}: gate '${g}' recorded ${c.gates[g]} but measures ${actual}`);
+        }
+      }
+      for (const sig of crit.signals) {
+        const key = `${sig.check}.${sig.metric}`;
+        const m = measured(sig.check);
+        if (m.verdict === "fail") {
+          fail(`${entry.scores}: signal check '${sig.check}' fails on this tree`);
+          continue;
+        }
+        const actual = m.signals[sig.metric];
+        const recorded = c.signals[key];
+        if (actual === undefined && recorded !== undefined) {
+          fail(`${entry.scores}: signal '${key}' recorded ${recorded} but is unmeasured on this tree`);
+        } else if (actual !== undefined && (recorded === undefined || Math.abs(actual - recorded) > 1e-6)) {
+          fail(`${entry.scores}: signal '${key}' recorded ${String(recorded)} but measures ${actual}`);
+        }
+      }
+    }
+  }
+}
+
+// Baseline gate (adr/0001, amended by iteration 0003 and adr/0006): paired
+// per-criterion non-regression against the last recorded value anywhere in
+// the baseline chain. judge "none" scores are strict; judge "llm" scores may
+// drop by at most the rubric's tolerance; ratchet signals are strict.
+// Criteria/signals recorded for the first time have no prior and pass.
+// `overall` is the reported weighted aggregate — not gated — because
+// iterations exercising different criteria sets are not comparable through
+// it. Fails closed.
 function latestPrior(
-  criterionId: string,
   entry: IterationEntry,
-): { score: number; from: string } | null {
+  pick: (s: Scores) => number | null | undefined,
+): { value: number; from: string } | null {
   let cursor = entry.baseline;
   const visited = new Set<string>();
   while (cursor && !visited.has(cursor)) {
@@ -193,8 +296,8 @@ function latestPrior(
     const prev = byId.get(cursor);
     if (!prev) return null;
     const prevScores = scoresById.get(prev.id);
-    const s = prevScores?.criteria[criterionId]?.score;
-    if (typeof s === "number") return { score: s, from: prev.id };
+    const v = prevScores ? pick(prevScores) : undefined;
+    if (typeof v === "number") return { value: v, from: prev.id };
     cursor = prev.baseline;
   }
   return null;
@@ -205,13 +308,30 @@ for (const entry of registry.iterations) {
   if (!scores || entry.baseline === null) continue;
   if (!byId.has(entry.baseline)) continue; // already failed above
   for (const [id, c] of Object.entries(scores.criteria)) {
-    if (c.score === null) continue;
-    const prior = latestPrior(id, entry);
-    if (prior && c.score < prior.score) {
-      fail(
-        `${entry.scores}: per-criterion regression: '${id}' scored ${c.score} < last recorded ` +
-          `${prior.score} (${prior.from}) — score must not decrease (adr/0001, amended)`,
-      );
+    const crit = rubric.byId[id];
+    if (!crit) continue;
+    if (c.score !== null) {
+      const prior = latestPrior(entry, (s) => s.criteria[id]?.score);
+      const slack = crit.judge === "llm" ? rubric.tolerance : 0;
+      if (prior && c.score < prior.value - slack - 1e-9) {
+        fail(
+          `${entry.scores}: per-criterion regression: '${id}' scored ${c.score} < last recorded ` +
+            `${prior.value} (${prior.from})${slack > 0 ? ` − tolerance ${slack}` : ""} (adr/0001, amended; adr/0006)`,
+        );
+      }
+    }
+    for (const sig of crit.signals) {
+      if (!sig.ratchet) continue;
+      const key = `${sig.check}.${sig.metric}`;
+      const v = c.signals?.[key];
+      if (typeof v !== "number") continue;
+      const prior = latestPrior(entry, (s) => s.criteria[id]?.signals?.[key]);
+      if (prior && v < prior.value - 1e-9) {
+        fail(
+          `${entry.scores}: signal regression: '${id}' ${key} ${v} < last recorded ${prior.value} ` +
+            `(${prior.from}) — ratchet signal may not decrease (adr/0006)`,
+        );
+      }
     }
   }
 }

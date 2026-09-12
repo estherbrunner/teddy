@@ -6,18 +6,29 @@
   "criteria": {
     "adr-traceability": {
       "score": 1,
-      "judge": "manifest-sync",
-      "rationale": "checks/manifest-sync.ts passes with cockpit-report.ts linked to adr/0002; no orphans introduced"
+      "judge": "none",
+      "rationale": "checks/manifest-sync.ts passes with cockpit-report.ts linked to adr/0002; no orphans introduced",
+      "gates": {
+        "manifest-sync": "pass",
+        "selftest": "pass",
+        "typecheck": "pass",
+        "lint": "pass"
+      },
+      "signals": {}
     },
     "cockpit-clarity": {
       "score": 1,
       "judge": "llm",
-      "rationale": "cockpit/main.ts render() draws the overall trend with baseline delta, per-criterion small multiples with hover rationales, the ADR status table with pending-approval chips, and the judge-surface bars — all on one page with no navigation (criterion's literal terms). Self-judged at bootstrap; subject to human review on merge — a downgrade here would trigger the loop-closure path"
+      "rationale": "cockpit/main.ts render() draws the overall trend with baseline delta, per-criterion small multiples with hover rationales, the ADR status table with pending-approval chips, and the judge-surface bars — all on one page with no navigation (criterion's literal terms). Self-judged at bootstrap; subject to human review on merge — a downgrade here would trigger the loop-closure path",
+      "gates": {},
+      "signals": {}
     },
     "loop-closure": {
       "score": null,
       "judge": "llm",
-      "rationale": "not exercised — no judge/human disagreement cycle has occurred yet"
+      "rationale": "not exercised — no judge/human disagreement cycle has occurred yet",
+      "gates": {},
+      "signals": {}
     }
   },
   "overall": 1,

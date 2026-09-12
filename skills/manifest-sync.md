@@ -1,11 +1,11 @@
 ---
 name: manifest-sync
-description: Use when manifest.json, adr/, rubrics/rubric.yaml, or checks/ changed, when the traceability gate fails in CI, or when adding any ADR, assertion, or criterion.
+description: Use when manifest.json, adr/, rubrics/rubric.ts, or checks/ changed, when the traceability gate fails in CI, or when adding any ADR, assertion, or criterion.
 ---
 
 # manifest-sync
 
-Keeps `manifest.json` consistent with `adr/` frontmatter, `rubrics/rubric.yaml`,
+Keeps `manifest.json` consistent with `adr/` frontmatter, `rubrics/rubric.ts`,
 and the files under `checks/`. This skill also *is* the deterministic judge for
 the `adr-traceability` criterion — the script, not your judgment, decides.
 
@@ -25,7 +25,9 @@ criteria) are always hand-maintained.
 - Every `accepted` ADR resolves to ≥1 assertion or ≥1 rubric criterion.
 - Every file under `checks/*.ts` (except `lib.ts`) is linked from ≥1 ADR —
   an unlinked check script is an **orphaned assertion** and fails the gate.
-- Manifest criteria ≡ `rubrics/rubric.yaml` `adrs:` section per ADR — no drift.
+- Manifest criteria ≡ `rubrics/rubric.ts` `adrs` map per ADR — no drift.
+- Every rubric gate and signal resolves to a `checks/<id>.ts`; the rubric
+  module imports nothing but its own type (adr/0006).
 - Any status other than `proposed` must trace to a true merge commit touching
   the ADR file (merge = approval, adr/0003). Direct, squash, and rebase merges
   don't count. On `pull_request` CI runs a missing trace is reported as
