@@ -4,7 +4,6 @@ type: feature
 goal: Implement adr/0005 — derive iteration closure from merge history, make cockpit/data.js a build output, delete the scribe; publish the cockpit from main via GitHub Pages.
 constraint: each exercised criterion must not decrease against its last recorded score (baseline: iterations/0005-lint-gate/scores.json)
 adr_refs: [0005]
-pr: null
 ---
 
 ## Scope

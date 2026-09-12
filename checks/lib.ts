@@ -16,15 +16,27 @@ export function isGitRepo(root: string): boolean {
 // First-parent merge commits touching a path — the "which merged PR brought
 // this change" query. Plain `git log -- path` silently hides merge commits
 // whose content came from the second parent (history simplification).
-export function mergeTrace(root: string, rel: string): string | null {
+// Newest first; `oldest` flips to the merge that introduced the path — the
+// one that landed it, as opposed to the latest one that touched it.
+export function mergeTrace(root: string, rel: string, oldest = false): string | null {
   const res = spawnSync(
     "git",
     ["-C", root, "log", "--first-parent", "--merges", "--format=%h %s", "--", rel],
     { encoding: "utf8" },
   );
   if (res.status !== 0) return null;
-  const first = res.stdout.trim().split("\n")[0];
-  return first === "" ? null : first;
+  const lines = res.stdout.trim().split("\n");
+  const line = oldest ? lines[lines.length - 1] : lines[0];
+  return line === "" ? null : line;
+}
+
+// The pull request that landed a path, read off the subject of the oldest
+// merge commit touching it ("Merge pull request #N from …") — GitHub writes
+// it, nobody stores it (adr/0005, amended). Null while unmerged or when the
+// subject was rewritten.
+export function mergedPr(root: string, rel: string): number | null {
+  const m = mergeTrace(root, rel, true)?.match(/Merge pull request #(\d+)\b/);
+  return m ? Number(m[1]) : null;
 }
 
 // Iteration closure is defined, not recorded (adr/0005): an iteration is

@@ -114,7 +114,6 @@ type: feature
 goal: Fixture iteration.
 constraint: each exercised criterion must not decrease against its last recorded score
 adr_refs: [0001]
-pr: null
 ---
 `;
 
@@ -169,7 +168,6 @@ type: feature
 goal: Fixture iteration two.
 constraint: each exercised criterion must not decrease against its last recorded score
 adr_refs: [0001]
-pr: null
 ---
 `;
 
@@ -230,10 +228,10 @@ function mergeIteration(root: string, id: string, branch: string, prNo: number):
   gitc(root, "merge", "-q", "--no-ff", branch, "-m", `Merge pull request #${prNo} from t/${branch}`);
 }
 
-function dataStatus(root: string, id: string): string | undefined {
+function dataIteration(root: string, id: string): { status: string; pr: number | null } | undefined {
   const js = readText(root, "cockpit/data.js");
   const data = JSON.parse(js.slice(js.indexOf("=") + 1).trim().replace(/;$/, ""));
-  return data.iterations.find((i: { id: string }) => i.id === id)?.status;
+  return data.iterations.find((i: { id: string }) => i.id === id);
 }
 
 // adr/0004 fixtures: a package.json declaring linters and fake local .bin
@@ -281,7 +279,7 @@ try {
     const rep = run(root, "cockpit-report.ts");
     expect(
       "valid tree: cockpit-report derives 'open' for an unmerged iteration",
-      rep.ok && dataStatus(root, "0001-fixture") === "open",
+      rep.ok && dataIteration(root, "0001-fixture")?.status === "open" && dataIteration(root, "0001-fixture")?.pr === null,
       rep.output,
     );
   }
@@ -434,10 +432,19 @@ try {
     const sc = run(root, "scores-check.ts");
     const rep = run(root, "cockpit-report.ts");
     expect("merged iteration passes scores-check", sc.ok, sc.output);
+    const it = dataIteration(root, "0001-fixture");
     expect(
-      "merged iteration is derived as 'closed' in data.js",
-      rep.ok && dataStatus(root, "0001-fixture") === "closed",
+      "merged iteration is derived as 'closed' with its PR number in data.js",
+      rep.ok && it?.status === "closed" && it?.pr === 10,
       rep.output,
+    );
+    // A later PR touching the directory must not steal the landing PR.
+    mergeIteration(root, "0001-fixture", "touch-1", 12);
+    const again = run(root, "cockpit-report.ts");
+    expect(
+      "derived PR is the oldest merge touching the iteration, not the latest",
+      again.ok && dataIteration(root, "0001-fixture")?.pr === 10,
+      again.output,
     );
   }
 
@@ -474,6 +481,19 @@ try {
       "accepted ADR on a PR branch defers trace to main",
       ms.ok && ms.output.includes("pending merge"),
       ms.output,
+    );
+  }
+
+  // J5 — legacy 'pr' in a ticket: the PR is read off the merge commit.
+  {
+    const root = makeTree();
+    roots.push(root);
+    write(root, "iterations/0001-fixture/ticket.md", TICKET.replace("adr_refs: [0001]", "adr_refs: [0001]\npr: null"));
+    const sc = run(root, "scores-check.ts");
+    expect(
+      "legacy ticket pr field is rejected",
+      !sc.ok && sc.output.includes("legacy field 'pr'"),
+      sc.output,
     );
   }
 

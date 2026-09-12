@@ -29,7 +29,8 @@ and `judge_surface` — the count of non-null criteria scored by a deterministic
 judge vs total. The cockpit plots `judge_surface.deterministic / total` over
 time: the shrinking-judge-surface metric. Judge-only criteria keep it below 1;
 a rising line means the loop is promoting judgments into assertions. The
-`repository` field (derived from `git remote`) powers the pending items'
+`repository` field (derived from `git remote`) and each iteration's `pr`
+(derived from its merge commit subject; `null` while open) power the
 deep-links to review/merge PRs — the cockpit renders, GitHub gates (adr/0003).
 
 ## Never

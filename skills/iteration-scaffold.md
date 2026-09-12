@@ -20,10 +20,10 @@ type: feature | bugfix | skill | decision | refactor
 goal: <one sentence>
 constraint: each exercised criterion must not decrease against its last recorded score (baseline: iterations/MMMM-slug/scores.json)
 adr_refs: [...]
-pr: null
 ---
 
-Body: scope, out-of-scope, affected criteria.
+Body: scope, out-of-scope, affected criteria. No `pr` field: the PR number
+is read off the merge commit (adr/0005, amended).
 ```
 
 3. Create `iterations/NNNN-slug/scores.json`: copy the **criteria keys** from

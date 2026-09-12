@@ -31,6 +31,7 @@ ticket → branch → implement → deterministic gates (hard) → rubric-judge 
 ```
 
 Per iteration (`iterations/NNNN-slug/`): a `ticket.md` and a `scores.json` snapshot.
+The PR that landed it is read off the merge commit, never stored (adr/0005).
 `null` scores mean "not exercised this iteration" and are excluded from the weighted
 average. `overall` is precomputed — the cockpit stays a static reader.
 
@@ -104,8 +105,8 @@ accounts; agents must never merge.
 
 ## Status
 
-ADRs 0001–0005 accepted; iterations 0001–0006 closed. Iteration 0006
-(adr/0005) removed the last stored copies of derived state: the registry's
-`status` field and the committed `cockpit/data.js`, along with the scribe
-that maintained them. Closure is now `git log`, and the cockpit is built,
-not committed.
+ADRs 0001–0005 accepted; iterations 0001–0007 closed. Iterations 0006–0007
+(adr/0005) removed the stored copies of derived state: the registry's
+`status`, the ticket's `pr`, and the committed `cockpit/data.js`, along
+with the scribe that maintained them. Closure and PR are `git log`; the
+cockpit is built, not committed.

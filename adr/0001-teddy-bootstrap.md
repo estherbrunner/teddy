@@ -111,7 +111,8 @@ binary gate — they must pass regardless of weighted score.
 
 One per iteration, required frontmatter: `id`, `type` (`feature | bugfix |
 skill | decision | refactor`), `goal`, `constraint` (score must not decrease
-against the named baseline), `adr_refs`, `pr` (filled on open). One PR per
+against the named baseline), `adr_refs`. (The original `pr` field is gone —
+derived from the merge commit since adr/0005, amended.) One PR per
 ticket — score deltas stay attributable; no squash-merging multiple concerns.
 
 ### Iteration workflow
