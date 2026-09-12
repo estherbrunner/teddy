@@ -26,8 +26,8 @@ Orphaned ADRs *and* orphaned assertions are failures.
 ```
 ticket → branch → implement → deterministic gates (hard) → rubric-judge scores
       → per-criterion non-regression vs last recorded score (fails closed)
-      → scribe closes the iteration on the branch once gates are green
-      → human merges — merge = approval, carrying the closure (adr/0003) → new baseline
+      → human merges — merge = approval (adr/0003); the merge commit *is* the
+        closure, nothing is written (adr/0005) → new baseline
 ```
 
 Per iteration (`iterations/NNNN-slug/`): a `ticket.md` and a `scores.json` snapshot.
@@ -51,10 +51,13 @@ Requires Node ≥ 23.6 (checks run on Node's native type-stripping; no build ste
 npm install
 npm test          # lint + selftest + all deterministic gates + typecheck
 npm run lint      # the lint gate alone (detects the declared linter, adr/0004)
-npm run report    # regenerate cockpit/data.js from manifests + scores
-npm run build     # tsc → cockpit/main.js
+npm run report    # generate cockpit/data.js from manifests + scores + merge history
+npm run build     # cockpit/data.js + tsc → cockpit/main.js
 open cockpit/index.html
 ```
+
+`cockpit/data.js` and `cockpit/main.js` are build outputs and not committed
+(adr/0005); `main` is published to GitHub Pages by `.github/workflows/pages.yml`.
 
 ## Repo tour
 
@@ -64,18 +67,17 @@ rubrics/rubric.yaml         weighted criteria + per-ADR criterion links
 checks/                     deterministic assertions
   manifest-sync.ts          traceability gate + merge-as-approval lifecycle gate
   scores-check.ts           scores schema + per-criterion baseline gate
-  cockpit-report.ts         regenerates/verifies cockpit/data.js
-  scribe.ts                 the one writer of derived state — runs in CI on the iteration PR
+  cockpit-report.ts         generates cockpit/data.js (closure derived from git, adr/0005)
   lint.ts                   lint gate: runs the linter declared in package.json (adr/0004)
   selftest.ts               verifies the checks themselves (fail + pass paths)
   lib.ts                    shared parsing/aggregation
 manifest.json               SSOT: adr → assertions → criteria
-manifest-of-iterations.json iteration registry (closure written by the scribe)
+manifest-of-iterations.json iteration registry (id, ticket, scores, baseline — no status)
 iterations/NNNN-slug/       ticket.md + scores.json per iteration
 cockpit/                    static dashboard (vanilla TS, no framework, no server)
 skills/                     agent skills: adr-author, rubric-judge, manifest-sync,
                             iteration-scaffold, cockpit-report
-.github/                    CI gate + scribe workflow + CODEOWNERS
+.github/                    CI gate + pages publish + CODEOWNERS
 ```
 
 ## GitHub gates (setup)
@@ -89,11 +91,12 @@ the mechanism; each team configures the strictness to its trust level:
    *Require a pull request before merging* (no direct pushes), *Dismiss stale
    reviews*, *Require review from Code Owners*. Required approval counts,
    reviewer sets, and bypass lists are the team's call.
-3. **Scribe** (`.github/workflows/scribe.yml`) — runs on `iteration/*` PRs:
-   once the gates are green it closes the iteration in the registry and
-   regenerates `cockpit/data.js` **on the branch**, so the merge itself
-   carries the derived state. It is the only writer of derived state — no
-   ruleset bypass, no PAT, no post-merge push.
+3. **Nothing writes derived state** (adr/0005). An iteration is *closed*
+   iff a merge commit touches `iterations/<id>/` — the checks and the
+   cockpit report derive it from `git log` on whatever ref they run against.
+   No scribe, no bot commits, no ruleset bypass. A PR that carries an ADR
+   status transition passes the gate on `pull_request` runs with the trace
+   *pending*; the merge realizes it and `main` reconciles.
 
 Trust boundary (adr/0003): actors with owner permissions are indistinguishable
 from humans. Teams wanting less-privileged agents run them on dedicated
@@ -101,7 +104,8 @@ accounts; agents must never merge.
 
 ## Status
 
-ADRs 0001–0004 accepted; iterations 0001–0005 closed. PR #4 merged the
-lint gate (adr/0004): `npm run lint` detects the linter declared in
-`package.json` — Biome, ESLint, oxlint, standard, xo — and runs it from its
-lockfile-pinned local install; Teddy itself adopts Biome.
+ADRs 0001–0005 accepted; iterations 0001–0006 closed. Iteration 0006
+(adr/0005) removed the last stored copies of derived state: the registry's
+`status` field and the committed `cockpit/data.js`, along with the scribe
+that maintained them. Closure is now `git log`, and the cockpit is built,
+not committed.

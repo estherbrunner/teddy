@@ -1,7 +1,7 @@
 {
   "name": "teddy",
   "version": "0.1.0",
-  "description": "TypeScript Eval-Driven Development — a self-hosted eval-driven development harness.",
+  "description": "TypeScript Eval-Driven Development \u2014 a self-hosted eval-driven development harness.",
   "type": "module",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "report": "node checks/cockpit-report.ts",
     "selftest": "node checks/selftest.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc",
+    "build": "node checks/cockpit-report.ts && tsc",
     "test": "npm run lint && npm run selftest && npm run check && npm run typecheck"
   },
   "devDependencies": {

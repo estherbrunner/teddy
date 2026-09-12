@@ -27,6 +27,14 @@ export function mergeTrace(root: string, rel: string): string | null {
   return first === "" ? null : first;
 }
 
+// Iteration closure is defined, not recorded (adr/0005): an iteration is
+// closed iff a first-parent merge commit touches its directory on the
+// current ref — i.e. its PR was merged (merge = approval, adr/0003).
+export type IterationStatus = "open" | "closed";
+export function iterationStatus(root: string, id: string): IterationStatus {
+  return mergeTrace(root, `iterations/${id}`) ? "closed" : "open";
+}
+
 // `origin` remote as a browsable https URL, e.g. for cockpit deep-links.
 export function repositoryUrl(root: string): string | null {
   const res = spawnSync("git", ["-C", root, "remote", "get-url", "origin"], {

@@ -2,16 +2,22 @@
 // into cockpit/data.js (window.__TEDDY_DATA__) so the static cockpit works from
 // file:// with no server and no fetch. All aggregation happens here — the cockpit
 // stays a dumb renderer (adr/0001: no aggregation logic duplicated in TS/JS).
+// data.js is a build output, never committed (adr/0005): iteration closure is
+// derived from merge history at generation time, so the file is exactly as
+// fresh as the ref it was generated from.
 // Usage:
 //   node checks/cockpit-report.ts [root]          regenerate cockpit/data.js
-//   node checks/cockpit-report.ts --check [root]  exit 1 if data.js is stale
-import { join } from "node:path";
-import { readFileSync } from "node:fs";
-import { parseRubric, readJson, readText, repositoryUrl, writeText } from "./lib.ts";
+//   node checks/cockpit-report.ts --check [root]  exit 1 if generation fails (writes nothing)
+import { isGitRepo, iterationStatus, parseRubric, readJson, readText, repositoryUrl, writeText } from "./lib.ts";
 
 const args = process.argv.slice(2);
 const checkOnly = args.includes("--check");
 const root = args.find((a) => !a.startsWith("--")) ?? process.cwd();
+
+if (!isGitRepo(root)) {
+  console.error("FAIL: cannot derive iteration closure — not a git repository (adr/0003, adr/0005)");
+  process.exit(1);
+}
 
 const rubric = parseRubric(readText(root, "rubrics/rubric.yaml"));
 const manifest = readJson<{
@@ -20,7 +26,7 @@ const manifest = readJson<{
 }>(root, "manifest.json");
 const registry = readJson<{
   version: number;
-  iterations: { id: string; scores: string; baseline: string | null; status: string }[];
+  iterations: { id: string; scores: string; baseline: string | null }[];
 }>(root, "manifest-of-iterations.json");
 
 const criteriaOut = Object.values(rubric.criteria).map((c) => ({
@@ -47,7 +53,7 @@ const iterationsOut = registry.iterations.map((entry) => {
   return {
     id: entry.id,
     baseline: entry.baseline,
-    status: entry.status,
+    status: iterationStatus(root, entry.id),
     timestamp: scores.timestamp,
     overall: scores.overall,
     deterministic_gate: scores.deterministic_gate,
@@ -76,18 +82,7 @@ const content = `window.__TEDDY_DATA__ = ${JSON.stringify(data, null, 2)};\n`;
 const dataRel = "cockpit/data.js";
 
 if (checkOnly) {
-  let existing: string;
-  try {
-    existing = readFileSync(join(root, dataRel), "utf8");
-  } catch {
-    console.error(`FAIL: ${dataRel} is missing — run: npm run report`);
-    process.exit(1);
-  }
-  if (existing !== content) {
-    console.error(`FAIL: ${dataRel} is stale — run: npm run report`);
-    process.exit(1);
-  }
-  console.log(`cockpit-report: OK (${dataRel} is fresh, ${iterationsOut.length} iterations)`);
+  console.log(`cockpit-report: OK (${dataRel} generates from the current tree, ${iterationsOut.length} iterations)`);
   process.exit(0);
 }
 

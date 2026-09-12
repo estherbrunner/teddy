@@ -1,0 +1,25 @@
+{
+  "iteration": "0006-derived-state",
+  "ticket": "0006",
+  "baseline": "0005-lint-gate",
+  "timestamp": "2026-09-12T10:30:00Z",
+  "criteria": {
+    "adr-traceability": {
+      "score": 1,
+      "judge": "manifest-sync",
+      "rationale": "checks/manifest-sync.ts passes: 5 ADRs resolve with manifest↔rubric.yaml parity and no orphans (5 linked assertions after checks/scribe.ts is removed); adr/0005 links cockpit-report, scores-check, and selftest. Both directions verified by the 27-case selftest: derived status (open / merged→closed), out-of-order merge rejected, legacy registry 'status' rejected, PR-run deferral of a pending ADR transition, and --check writing nothing"
+    },
+    "cockpit-clarity": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not exercised — cockpit/main.ts is untouched; data.js keeps the same shape, only its provenance changes"
+    },
+    "loop-closure": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not exercised — adr/0005 is a directed design decision following the architecture review, not a judge/human disagreement"
+    }
+  },
+  "overall": 1,
+  "deterministic_gate": "pass"
+}

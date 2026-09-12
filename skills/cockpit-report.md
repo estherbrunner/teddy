@@ -5,21 +5,22 @@ description: Use after any change to scores.json, manifest.json, manifest-of-ite
 
 # cockpit-report
 
-Regenerates `cockpit/data.js` from `manifest.json` +
-`manifest-of-iterations.json` + `iterations/*/scores.json` + `rubrics/rubric.yaml`.
+Generates `cockpit/data.js` from `manifest.json` +
+`manifest-of-iterations.json` + `iterations/*/scores.json` + `rubrics/rubric.yaml`
++ merge history (iteration `status` is derived from `git log`, adr/0005).
 All aggregation lives in the generator (`checks/cockpit-report.ts`); the cockpit
 renders `window.__TEDDY_DATA__` and computes nothing — that split is adr/0001.
 
 ## Run it
 
 ```sh
-npm run report                              # regenerate cockpit/data.js
-node checks/cockpit-report.ts --check       # exit 1 if data.js is stale (CI runs this)
+npm run report                              # generate cockpit/data.js (gitignored)
+node checks/cockpit-report.ts --check       # exit 1 if generation fails (CI runs this)
 ```
 
-Run `npm run report` in the same commit that changes any input file, so
-`--check` stays green. `data.js` is committed: the cockpit must work from a
-fresh clone opened as `file://` with zero build steps.
+`data.js` is a build output, never committed: it is exactly as fresh as the
+ref it was generated from. `main` is published by `.github/workflows/pages.yml`;
+locally, `npm run report` then open `cockpit/index.html` as `file://`.
 
 ## Reading it
 
@@ -33,7 +34,9 @@ deep-links to review/merge PRs — the cockpit renders, GitHub gates (adr/0003).
 
 ## Never
 
-- Hand-edit `cockpit/data.js` — `--check` diffs it against the inputs and will
-  reject the drift; regenerate instead.
+- Commit `cockpit/data.js`, or hand-edit it — it is overwritten on every
+  generation and ignored by git.
+- Store an iteration's `status` anywhere — it is derived from the merge
+  commit; `scores-check` rejects the field.
 - Move aggregation into `cockpit/main.ts` — that duplicates the formula and
   defeats the "static reader" decision (adr/0001). Change the generator.
