@@ -1,12 +1,12 @@
 ---
 name: cockpit-report
-description: Use after any change to scores.json, manifest.json, manifest-of-iterations.json, or rubric.yaml — regenerating and verifying the static cockpit data file.
+description: Use after any change to scores.json, manifest.json, manifest-of-iterations.json, or rubric.ts — regenerating and verifying the static cockpit data file.
 ---
 
 # cockpit-report
 
 Generates `cockpit/data.js` from `manifest.json` +
-`manifest-of-iterations.json` + `iterations/*/scores.json` + `rubrics/rubric.yaml`
+`manifest-of-iterations.json` + `iterations/*/scores.json` + `rubrics/rubric.ts`
 + merge history (iteration `status` is derived from `git log`, adr/0005).
 All aggregation lives in the generator (`checks/cockpit-report.ts`); the cockpit
 renders `window.__TEDDY_DATA__` and computes nothing — that split is adr/0001.

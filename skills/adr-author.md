@@ -35,11 +35,11 @@ rubric_refs: []
 - **Alternative** — why rejected (one sentence).
 ```
 
-3. Fill in `rubric_refs` with criterion ids from `rubrics/rubric.yaml` (or
+3. Fill in `rubric_refs` with criterion ids from `rubrics/rubric.ts` (or
    propose new criteria in the same change).
 4. Add a matching entry to `manifest.json` (`status: proposed`, linked
-   assertions/criteria) and the `adrs:` section of `rubrics/rubric.yaml` —
-   the two must agree.
+   assertions/criteria) and the `adrs` map of `rubrics/rubric.ts` — the two
+   must agree.
 5. Run `node checks/manifest-sync.ts` — it must pass before you commit.
 
 ## Changing status

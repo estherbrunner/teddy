@@ -6,18 +6,29 @@
   "criteria": {
     "adr-traceability": {
       "score": 1,
-      "judge": "manifest-sync",
-      "rationale": "checks/manifest-sync.ts passes: both ADRs resolve to linked assertions/criteria, no orphaned ADRs or assertions, rubric.yaml agrees with manifest.json; gate verified to reject unapproved transitions and orphans by checks/selftest.ts"
+      "judge": "none",
+      "rationale": "checks/manifest-sync.ts passes: both ADRs resolve to linked assertions/criteria, no orphaned ADRs or assertions, rubric.yaml agrees with manifest.json; gate verified to reject unapproved transitions and orphans by checks/selftest.ts",
+      "gates": {
+        "manifest-sync": "pass",
+        "selftest": "pass",
+        "typecheck": "pass",
+        "lint": "pass"
+      },
+      "signals": {}
     },
     "cockpit-clarity": {
       "score": null,
       "judge": "llm",
-      "rationale": "not exercised — the cockpit does not exist until iteration 0002"
+      "rationale": "not exercised — the cockpit does not exist until iteration 0002",
+      "gates": {},
+      "signals": {}
     },
     "loop-closure": {
       "score": null,
       "judge": "llm",
-      "rationale": "not exercised — no judge/human disagreement cycle has occurred yet"
+      "rationale": "not exercised — no judge/human disagreement cycle has occurred yet",
+      "gates": {},
+      "signals": {}
     }
   },
   "overall": 1,

@@ -49,6 +49,18 @@
       "criteria": [
         "adr-traceability"
       ]
+    },
+    "0006-rubric-v2-evidence-and-judge": {
+      "status": "accepted",
+      "assertions": [
+        "checks/scores-check.ts",
+        "checks/typecheck.ts",
+        "checks/test.ts",
+        "checks/coverage.ts"
+      ],
+      "criteria": [
+        "adr-traceability"
+      ]
     }
   }
 }

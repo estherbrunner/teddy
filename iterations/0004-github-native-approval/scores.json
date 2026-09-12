@@ -6,18 +6,29 @@
   "criteria": {
     "adr-traceability": {
       "score": 1,
-      "judge": "manifest-sync",
-      "rationale": "checks/manifest-sync.ts passes: 3 ADRs resolve with manifest↔rubric parity and no orphans; accepted ADRs reconcile against merge history (grandfathered 0001/0002 per adr/0003); legacy approved_by rejected by both schema guards — verified in both directions by the 19-case selftest (git-backed fixtures)"
+      "judge": "none",
+      "rationale": "checks/manifest-sync.ts passes: 3 ADRs resolve with manifest↔rubric parity and no orphans; accepted ADRs reconcile against merge history (grandfathered 0001/0002 per adr/0003); legacy approved_by rejected by both schema guards — verified in both directions by the 19-case selftest (git-backed fixtures)",
+      "gates": {
+        "manifest-sync": "pass",
+        "selftest": "pass",
+        "typecheck": "pass",
+        "lint": "pass"
+      },
+      "signals": {}
     },
     "cockpit-clarity": {
       "score": 1,
       "judge": "llm",
-      "rationale": "cockpit/main.ts keeps trend, ADR status, and judge-surface ratio on the single page and now renders the approval column as merge state (merged ✓ for accepted; ⚠ review & merge ↗ deep-linking to the repository's PR queue for pending items, per adr/0003) — no extra clicks. Self-judged pending human review; a downgrade here is the next loop-closure datum"
+      "rationale": "cockpit/main.ts keeps trend, ADR status, and judge-surface ratio on the single page and now renders the approval column as merge state (merged ✓ for accepted; ⚠ review & merge ↗ deep-linking to the repository's PR queue for pending items, per adr/0003) — no extra clicks. Self-judged pending human review; a downgrade here is the next loop-closure datum",
+      "gates": {},
+      "signals": {}
     },
     "loop-closure": {
       "score": null,
       "judge": "llm",
-      "rationale": "not exercised — adr/0003 was a directed design decision, not a judge/human disagreement"
+      "rationale": "not exercised — adr/0003 was a directed design decision, not a judge/human disagreement",
+      "gates": {},
+      "signals": {}
     }
   },
   "overall": 1,

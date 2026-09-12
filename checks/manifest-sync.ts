@@ -1,6 +1,6 @@
 // Deterministic traceability gate (serves rubric criterion 'adr-traceability').
 // Verifies: ADR frontmatter integrity, the merge-as-approval lifecycle gate
-// (adr/0003), manifest.json ↔ adr ↔ rubric.yaml consistency, and orphan
+// (adr/0003), manifest.json ↔ adr ↔ rubrics/rubric.ts consistency, and orphan
 // detection.
 // Usage: node checks/manifest-sync.ts [root] [--fix]
 // Exit 0 = consistent, 1 = failures listed below. --fix syncs manifest
@@ -11,21 +11,22 @@ import {
   isGitRepo,
   listAdrs,
   listCheckScripts,
+  loadRubric,
   mergeTrace,
-  parseRubric,
   readJson,
-  readText,
+  RUBRIC_PATH,
   writeText,
   type AdrInfo,
+  type LoadedRubric,
 } from "./lib.ts";
 
 const args = process.argv.slice(2);
 const fix = args.includes("--fix");
 const root = args.find((a) => !a.startsWith("--")) ?? process.cwd();
 
-let rubric: ReturnType<typeof parseRubric>;
+let rubric: LoadedRubric;
 try {
-  rubric = parseRubric(readText(root, "rubrics/rubric.yaml"));
+  rubric = await loadRubric(root);
 } catch (e) {
   console.error(`FAIL: ${(e as Error).message}`);
   process.exit(1);
@@ -102,7 +103,7 @@ function verify(): string[] {
       }
     }
     for (const ref of strArray(fm.rubric_refs)) {
-      if (!rubric.criteria[ref]) fail(`${file}: rubric_refs references unknown criterion '${ref}'`);
+      if (!rubric.byId[ref]) fail(`${file}: rubric_refs references unknown criterion '${ref}'`);
     }
     const supersedes = fm.supersedes;
     const supersededBy = fm.superseded_by;
@@ -141,25 +142,38 @@ function verify(): string[] {
       if (!exists(root, a)) fail(`manifest.json: assertion '${a}' of '${slug}' does not exist`);
     }
     for (const c of strArray(entry.criteria)) {
-      if (!rubric.criteria[c]) {
+      if (!rubric.byId[c]) {
         fail(`manifest.json: criteria drift for '${slug}': unknown criterion '${c}'`);
       }
     }
     if (status === "accepted" && assertions.length === 0 && strArray(entry.criteria).length === 0) {
       fail(`manifest.json: traceability: accepted ADR '${slug}' has neither assertion nor criterion`);
     }
-    // rubric.yaml ↔ manifest.json criteria parity (manifest is the SSOT for
+    // rubric.ts ↔ manifest.json criteria parity (manifest is the SSOT for
     // links, but the rubric's adrs section must not contradict it).
     const rubricCriteria = rubric.adrs[slug];
     if (rubricCriteria) {
       if (JSON.stringify([...strArray(entry.criteria)].sort()) !== JSON.stringify([...rubricCriteria].sort())) {
         fail(
           `manifest.json: criteria drift for '${slug}': manifest=[${strArray(entry.criteria)}] ` +
-            `rubric.yaml=[${rubricCriteria}]`,
+            `${RUBRIC_PATH}=[${rubricCriteria}]`,
         );
       }
     } else if (strArray(entry.criteria).length > 0) {
-      fail(`manifest.json: criteria drift for '${slug}': linked criteria but rubric.yaml has no entry`);
+      fail(`manifest.json: criteria drift for '${slug}': linked criteria but ${RUBRIC_PATH} has no entry`);
+    }
+  }
+
+  // Rubric gates and signals must resolve to check scripts (adr/0006).
+  const scripts = new Set(listCheckScripts(root).map((f) => `checks/${f}`));
+  for (const c of rubric.criteria) {
+    for (const g of c.gates) {
+      if (!scripts.has(`checks/${g}.ts`)) fail(`${RUBRIC_PATH}: '${c.id}' gate '${g}' has no checks/${g}.ts`);
+    }
+    for (const sig of c.signals) {
+      if (!scripts.has(`checks/${sig.check}.ts`)) {
+        fail(`${RUBRIC_PATH}: '${c.id}' signal '${sig.check}.${sig.metric}' has no checks/${sig.check}.ts`);
+      }
     }
   }
 
@@ -204,5 +218,5 @@ if (fails.length > 0) {
 }
 console.log(
   `manifest-sync: OK (${parsed.length} ADRs, ${referenced.size} linked assertions, ` +
-    `${Object.keys(rubric.criteria).length} criteria)`,
+    `${rubric.criteria.length} criteria)`,
 );

@@ -30,6 +30,8 @@ interface RubricCriterion {
   description: string;
   weight: number;
   judge: string;
+  gates: string[];
+  signals: string[];
 }
 interface TeddyData {
   version: number;
@@ -204,7 +206,8 @@ function render(): void {
       const lastVal = [...vals].reverse().find((v) => v !== null) ?? null;
       t.appendChild(el("span", "val", lastVal === null ? "not exercised" : fmt(lastVal)));
       mini.appendChild(t);
-      mini.appendChild(el("div", "meta", `weight ${c.weight} · judge ${c.judge}`));
+      const evidence = [...c.gates, ...c.signals];
+      mini.appendChild(el("div", "meta", `weight ${c.weight} · judge ${c.judge}${evidence.length ? ` · evidence ${evidence.join(", ")}` : ""}`));
       mini.appendChild(lineChart(
         vals,
         its.map((i) => shortId(i.id)),
@@ -270,7 +273,7 @@ function render(): void {
 
   // 4 — judge surface over time
   {
-    const s = section("Judge surface", "share of exercised criteria scored by a deterministic judge — should approach 1 as judgments get promoted");
+    const s = section("Judge surface", "weight of exercised criteria scored deterministically (judge none) over exercised weight — should approach 1 as judgments get promoted");
     for (const it of its) {
       const row = el("div", "jrow");
       row.appendChild(el("span", "lbl", it.id));

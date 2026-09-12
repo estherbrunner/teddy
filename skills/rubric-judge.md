@@ -1,46 +1,61 @@
 ---
 name: rubric-judge
-description: Use when scoring rubric criteria for an iteration — LLM-as-judge scoring with evidence-based rationale, writing into iterations/NNNN-slug/scores.json.
+description: Use when scoring rubric criteria for an iteration — recording deterministic evidence (gates, signals) and, for llm criteria, an anchored score with an evidence-citing rationale in iterations/NNNN-slug/scores.json.
 ---
 
 # rubric-judge
 
-Scores the affected rubric criteria for the current iteration and records
-evidence-based rationales. You are the LLM half of the loop; the human review
-that follows is the corrective when you and the human disagree.
+Scores the affected criteria for the current iteration. Since adr/0006 a
+criterion is *evidence first*: its gates and signals are measured, recorded,
+and re-verified by CI; only what remains is a judgment, and the judgment is
+bounded by the evidence. The LLM judge runs **locally only** — never in CI.
+(Until `checks/judge.ts` lands in iteration 0009, you are the judge.)
 
 ## Steps
 
-1. Read the criterion in `rubrics/rubric.yaml` — score against *its words*, not
-   your own idea of quality.
-2. Gather evidence: the iteration's diff, the touched artifacts, output of the
-   deterministic checks. Rationales must cite specifics (file, behavior, diff).
-3. Score each affected criterion `0`–`1` (null = not exercised this iteration —
-   do not force a number onto untouched criteria).
-4. Recompute `overall = Σ(weightᵢ × scoreᵢ) / Σ(weightᵢ)` over non-null criteria
-   (weights from `rubrics/rubric.yaml`) and store it in `scores.json`.
-   `scores-check` recomputes it and rejects arithmetic errors.
-5. Run `node checks/scores-check.ts`. If the baseline gate fails (a criterion
-   scored below its last recorded value — adr/0001, amended), the iteration is
-   **not done**: improve the work or descope. Never lower a score's prior, and
-   never null out previously scored criteria to pass.
+1. Read the criterion in `rubrics/rubric.ts`: its `gates`, `signals`, `judge`,
+   and — for `"llm"` — its `anchors`. Score against the anchors' words.
+2. Measure the evidence: for every gate run `node checks/<id>.ts --json` and
+   record `pass` | `skip` under `gates`; for every signal record the value
+   the check emits under `signals` as `"<check>.<metric>"`. Never type a
+   verdict or a value you did not measure — `scores-check` re-runs them.
+3. Score:
+   - `judge: "none"` → `1` if every gate and signal passed; `null` if any
+     was skipped or unmeasured. Nothing else is valid.
+   - `judge: "llm"` → `0`–`1` against the anchors, with the diff, the gate
+     output and the signal values as evidence. Skipped/unmeasured evidence
+     caps the score at `0.5`; with no declared evidence, a score above `0.5`
+     needs a rationale citing a file. `null` = not exercised this iteration.
+4. Rationales cite specifics (file, behaviour, diff hunk) so a reviewer can
+   check the number by reading, not by trusting.
+5. Recompute `overall = Σ(weightᵢ × scoreᵢ) / Σ(weightᵢ)` over non-null
+   criteria and store it. Run `node checks/scores-check.ts`: it recomputes
+   `overall`, re-runs the evidence, enforces the bounds, and applies the
+   baseline gate (strict for `"none"` scores and `ratchet` signals; the
+   rubric's `tolerance` for `"llm"` scores). If it fails, the iteration is
+   **not done**: improve the work or descope. Never lower a prior, never null
+   out a previously scored criterion to pass.
 
 ## Judge–human disagreement
 
-If the human reviewer disagrees with your score, the resolution is structural,
-not negotiable: an ADR amendment clarifying the criterion, or promoting the
-property to a deterministic assertion in `checks/` (shrinking judge surface).
-Note the disagreement in the iteration's PR so it becomes trackable.
+If the human reviewer disagrees with a score, the resolution is structural,
+not negotiable: an ADR amendment sharpening the anchors, or promoting the
+property to a gate or signal (shrinking judge surface). Note the
+disagreement in the iteration's PR so it becomes trackable.
 
 ## Never
 
 - Merge a PR — the merge *is* approval and closure (adr/0003, adr/0005);
   agents never merge.
 - Transition ADR status as a side effect of scoring.
-- Score a criterion you cannot cite evidence for; leave it null instead.
+- Record a gate or signal you did not run; score a criterion you cannot cite
+  evidence for — leave it null instead.
 - Round a weak result up "because the trend is right" — report the number.
 
 ## Red flags — stop
 
-- "Close enough to 1" → then justify 1 with evidence, or score what the evidence shows.
+- "Close enough to 1" → justify 1 against the `1` anchor with evidence, or
+  score what the evidence shows.
 - "Nothing in the diff touches this criterion, but I'll score it anyway" → null.
+- "The gate skipped but the code is obviously fine" → the cap is 0.5; make
+  the gate run.

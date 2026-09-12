@@ -8,7 +8,7 @@
 // Usage:
 //   node checks/cockpit-report.ts [root]          regenerate cockpit/data.js
 //   node checks/cockpit-report.ts --check [root]  exit 1 if generation fails (writes nothing)
-import { isGitRepo, iterationStatus, mergedPr, parseRubric, readJson, readText, repositoryUrl, writeText } from "./lib.ts";
+import { isGitRepo, iterationStatus, loadRubric, mergedPr, readJson, repositoryUrl, writeText } from "./lib.ts";
 
 const args = process.argv.slice(2);
 const checkOnly = args.includes("--check");
@@ -19,7 +19,7 @@ if (!isGitRepo(root)) {
   process.exit(1);
 }
 
-const rubric = parseRubric(readText(root, "rubrics/rubric.yaml"));
+const rubric = await loadRubric(root);
 const manifest = readJson<{
   version: number;
   adrs: Record<string, { status: string; assertions: string[]; criteria: string[] }>;
@@ -29,26 +29,40 @@ const registry = readJson<{
   iterations: { id: string; scores: string; baseline: string | null }[];
 }>(root, "manifest-of-iterations.json");
 
-const criteriaOut = Object.values(rubric.criteria).map((c) => ({
+const criteriaOut = rubric.criteria.map((c) => ({
   id: c.id,
   description: c.description,
   weight: c.weight,
   judge: c.judge,
+  gates: c.gates,
+  signals: c.signals.map((s) => `${s.check}.${s.metric}`),
 }));
 
 const iterationsOut = registry.iterations.map((entry) => {
   const scores = readJson<{
     timestamp: string;
-    criteria: Record<string, { score: number | null; judge: string; rationale: string }>;
+    criteria: Record<
+      string,
+      {
+        score: number | null;
+        judge: string;
+        rationale: string;
+        gates?: Record<string, string>;
+        signals?: Record<string, number>;
+      }
+    >;
     overall: number;
     deterministic_gate: string;
   }>(root, entry.scores);
+  // Judge surface (adr/0002, redefined by adr/0006): weight on exercised
+  // criteria whose score is deterministic (judge "none") over exercised weight.
   let total = 0;
   let deterministic = 0;
   for (const [id, c] of Object.entries(scores.criteria)) {
     if (c.score === null) continue;
-    total++;
-    if (rubric.criteria[id] && rubric.criteria[id].judge !== "llm") deterministic++;
+    const w = rubric.byId[id]?.weight ?? 0;
+    total += w;
+    if (rubric.byId[id] && rubric.byId[id].judge === "none") deterministic += w;
   }
   return {
     id: entry.id,
@@ -75,7 +89,7 @@ const data = {
   version: 1,
   generated_by: "checks/cockpit-report.ts",
   repository: repositoryUrl(root),
-  rubric: { version: rubric.version, criteria: criteriaOut },
+  rubric: { version: rubric.version, tolerance: rubric.tolerance, criteria: criteriaOut },
   adrs: adrsOut,
   iterations: iterationsOut,
 };

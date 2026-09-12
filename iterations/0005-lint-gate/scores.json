@@ -6,18 +6,29 @@
   "criteria": {
     "adr-traceability": {
       "score": 1,
-      "judge": "manifest-sync",
-      "rationale": "checks/manifest-sync.ts passes: 4 ADRs resolve, adr/0004 linked to its assertion checks/lint.ts with manifest↔rubric.yaml parity and no orphans (6 linked assertions); both directions verified by the 26-case selftest — the 6 new lint-gate cases exercise detection, skip, fail-closed, and priority-order paths against git-backed fixtures"
+      "judge": "none",
+      "rationale": "checks/manifest-sync.ts passes: 4 ADRs resolve, adr/0004 linked to its assertion checks/lint.ts with manifest↔rubric.yaml parity and no orphans (6 linked assertions); both directions verified by the 26-case selftest — the 6 new lint-gate cases exercise detection, skip, fail-closed, and priority-order paths against git-backed fixtures",
+      "gates": {
+        "manifest-sync": "pass",
+        "selftest": "pass",
+        "typecheck": "pass",
+        "lint": "pass"
+      },
+      "signals": {}
     },
     "cockpit-clarity": {
       "score": null,
       "judge": "llm",
-      "rationale": "not exercised — the dashboard is untouched by this iteration"
+      "rationale": "not exercised — the dashboard is untouched by this iteration",
+      "gates": {},
+      "signals": {}
     },
     "loop-closure": {
       "score": null,
       "judge": "llm",
-      "rationale": "not exercised — no judge/human disagreement surfaced"
+      "rationale": "not exercised — no judge/human disagreement surfaced",
+      "gates": {},
+      "signals": {}
     }
   },
   "overall": 1,
