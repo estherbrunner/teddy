@@ -21,6 +21,7 @@ id: NNNN
 status: proposed
 supersedes: null
 superseded_by: null
+assertions: []
 rubric_refs: []
 ---
 
@@ -35,12 +36,13 @@ rubric_refs: []
 - **Alternative** — why rejected (one sentence).
 ```
 
-3. Fill in `rubric_refs` with criterion ids from `rubrics/rubric.ts` (or
-   propose new criteria in the same change).
-4. Add a matching entry to `manifest.json` (`status: proposed`, linked
-   assertions/criteria) and the `adrs` map of `rubrics/rubric.ts` — the two
-   must agree.
-5. Run `node checks/manifest-sync.ts` — it must pass before you commit.
+3. Fill in `rubric_refs` with criterion ids from the rubric (`teddy.config.ts`,
+   or Teddy's default rubric) — or propose new criteria in the same change.
+4. Fill in `assertions` with the checks that enforce the decision: a host
+   check path (`checks/x.ts`) or a built-in (`teddy:lint`). The frontmatter
+   is the only place links live (adr/0007) — there is no manifest.
+5. Run `teddy manifest-sync` (in this repo: `node src/cli.ts manifest-sync`)
+   — it must pass before you commit.
 
 ## Changing status
 

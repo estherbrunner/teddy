@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-09-13T12:00:00Z",
+  "criteria": {
+    "adr-traceability": {
+      "score": 1,
+      "judge": "none",
+      "rationale": "Deterministic: gates manifest-sync, selftest, typecheck and lint pass on this tree; scores-check re-runs them for this open iteration. adr/0007 links teddy:manifest-sync, teddy:scores-check and checks/selftest.ts; every ADR carries assertions in frontmatter; no orphan host checks",
+      "gates": { "manifest-sync": "pass", "selftest": "pass", "typecheck": "pass", "lint": "pass" },
+      "signals": {}
+    },
+    "cockpit-clarity": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not judged — the renderer is unchanged apart from reading data version 2",
+      "gates": {},
+      "signals": {}
+    },
+    "loop-closure": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not judged — no judge/human disagreement surfaced",
+      "gates": {},
+      "signals": {}
+    }
+  }
+}

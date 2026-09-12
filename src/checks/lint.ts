@@ -5,7 +5,7 @@
 // or lint findings → exit 1: the gate fails closed on verification, not on
 // absence. Honours the --json check contract (adr/0006).
 // Usage: node checks/lint.ts [--json] [root]
-import { declaredDeps, emitResult, localBin, runTool } from "./lib.ts";
+import { declaredDeps, emitResult, localBin, runTool } from "../lib.ts";
 
 const args = process.argv.slice(2);
 const json = args.includes("--json");

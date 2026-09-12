@@ -7,6 +7,8 @@ interface CriterionScore {
   score: number | null;
   judge: string;
   rationale: string;
+  gates?: Record<string, string>;
+  signals?: Record<string, number>;
 }
 interface Iteration {
   id: string;
@@ -15,7 +17,6 @@ interface Iteration {
   pr: number | null;
   timestamp: string;
   overall: number;
-  deterministic_gate: string;
   judge_surface: { deterministic: number; total: number };
   criteria: Record<string, CriterionScore>;
 }
@@ -165,7 +166,10 @@ function render(): void {
   } else {
     bigrow.appendChild(el("div", "delta flat", "first iteration — no baseline"));
   }
-  bigrow.appendChild(el("span", `chip ${latest.deterministic_gate === "pass" ? "accepted" : "pending"}`, `deterministic gate: ${latest.deterministic_gate}`));
+  // adr/0007: the deterministic gate is the recorded evidence — every gate pass|skip, none failed.
+  const gateEntries = Object.values(latest.criteria).flatMap((c) => Object.values(c.gates ?? {}));
+  const gateLabel = gateEntries.length === 0 ? "no gates" : gateEntries.every((g) => g === "pass") ? "pass" : "pass (some skipped)";
+  bigrow.appendChild(el("span", "chip accepted", `deterministic gate: ${gateLabel}`));
   // adr/0005 (amended): the PR is read off the merge commit, never stored —
   // closed iterations link to it; open ones are found by their branch name.
   if (data.repository) {

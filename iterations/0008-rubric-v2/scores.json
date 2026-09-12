@@ -1,14 +1,16 @@
 {
-  "iteration": "0008-rubric-v2",
-  "ticket": "0008",
-  "baseline": "0007-derived-pr-link",
   "timestamp": "2026-09-12T15:00:00Z",
   "criteria": {
     "adr-traceability": {
       "score": 1,
       "judge": "none",
       "rationale": "Deterministic: gates manifest-sync, selftest, typecheck and lint all pass on this tree; scores-check re-runs them for this open iteration and records agreement. adr/0006 links scores-check, typecheck, test and coverage; rubric.ts gates resolve to check scripts; no orphans",
-      "gates": { "manifest-sync": "pass", "selftest": "pass", "typecheck": "pass", "lint": "pass" },
+      "gates": {
+        "manifest-sync": "pass",
+        "selftest": "pass",
+        "typecheck": "pass",
+        "lint": "pass"
+      },
       "signals": {}
     },
     "cockpit-clarity": {
@@ -25,7 +27,5 @@
       "gates": {},
       "signals": {}
     }
-  },
-  "overall": 1,
-  "deterministic_gate": "pass"
+  }
 }

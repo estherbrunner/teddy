@@ -1,6 +1,6 @@
 ---
 name: iteration-scaffold
-description: Use when starting a new iteration — creating its ticket, branch, and initial scores.json, and registering it in manifest-of-iterations.json.
+description: Use when starting a new iteration — creating its directory, ticket, branch, and initial scores.json. There is no registry: the directory is the iteration.
 ---
 
 # iteration-scaffold
@@ -27,25 +27,21 @@ is read off the merge commit (adr/0005, amended).
 ```
 
 3. Create `iterations/NNNN-slug/scores.json`: copy the **criteria keys** from
-   the baseline's scores.json, set every `score` to `null`, and set:
+   the previous iteration's scores.json (or the rubric), set every `score`
+   to `null`, and record no evidence yet:
 
 ```json
 {
-  "iteration": "NNNN-slug",
-  "ticket": "NNNN",
-  "baseline": "MMMM-slug",
   "timestamp": "<UTC now, ISO-8601>",
-  "criteria": { "...": { "score": null, "judge": "…", "rationale": "not yet exercised" } },
-  "overall": 0,
-  "deterministic_gate": "pass"
+  "criteria": { "...": { "score": null, "judge": "…", "rationale": "not yet exercised", "gates": {}, "signals": {} } }
 }
 ```
 
-4. Register the iteration in `manifest-of-iterations.json` (`id`, `ticket`,
-   `scores`, `baseline` = previous iteration id; `null` only for the first).
-   There is no status field: an iteration is *closed* iff its PR was merged
-   (derived from `git log`, adr/0005).
-5. `git checkout -b iteration/NNNN-slug`.
+   Nothing else: `iteration`, `ticket`, `baseline`, `overall` are derived
+   from the directory and git (adr/0007) and are rejected if stored.
+4. `git checkout -b iteration/NNNN-slug`. The directory *is* the
+   registration; its baseline is the last iteration on the trunk at the
+   merge base, its closure is the merge of its PR.
 
 Closure is not your concern: the merge commit of the iteration's PR *is*
 the closure. Nobody — human, agent, or bot — writes closure state.
@@ -55,7 +51,7 @@ the closure. Nobody — human, agent, or bot — writes closure state.
 With all scores `null`, `scores-check` fails ("nothing exercised") until
 `rubric-judge` fills in real scores. That is the fails-closed gate working:
 an iteration with no evidence cannot pass. Deterministic gates
-(`node checks/manifest-sync.ts`) must pass from the first commit.
+(`teddy manifest-sync`) must pass from the first commit.
 
 ## Never
 

@@ -1,7 +1,4 @@
 {
-  "iteration": "0007-derived-pr-link",
-  "ticket": "0007",
-  "baseline": "0006-derived-state",
   "timestamp": "2026-09-12T12:00:00Z",
   "criteria": {
     "adr-traceability": {
@@ -30,7 +27,5 @@
       "gates": {},
       "signals": {}
     }
-  },
-  "overall": 1,
-  "deterministic_gate": "pass"
+  }
 }

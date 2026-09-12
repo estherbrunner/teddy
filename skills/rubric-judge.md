@@ -13,9 +13,9 @@ bounded by the evidence. The LLM judge runs **locally only** — never in CI.
 
 ## Steps
 
-1. Read the criterion in `rubrics/rubric.ts`: its `gates`, `signals`, `judge`,
+1. Read the criterion in the rubric (`teddy.config.ts`, or Teddy's default): its `gates`, `signals`, `judge`,
    and — for `"llm"` — its `anchors`. Score against the anchors' words.
-2. Measure the evidence: for every gate run `node checks/<id>.ts --json` and
+2. Measure the evidence: for every gate run `teddy <id> --json` and
    record `pass` | `skip` under `gates`; for every signal record the value
    the check emits under `signals` as `"<check>.<metric>"`. Never type a
    verdict or a value you did not measure — `scores-check` re-runs them.
@@ -28,9 +28,9 @@ bounded by the evidence. The LLM judge runs **locally only** — never in CI.
      needs a rationale citing a file. `null` = not exercised this iteration.
 4. Rationales cite specifics (file, behaviour, diff hunk) so a reviewer can
    check the number by reading, not by trusting.
-5. Recompute `overall = Σ(weightᵢ × scoreᵢ) / Σ(weightᵢ)` over non-null
-   criteria and store it. Run `node checks/scores-check.ts`: it recomputes
-   `overall`, re-runs the evidence, enforces the bounds, and applies the
+5. `overall = Σ(weightᵢ × scoreᵢ) / Σ(weightᵢ)` over non-null criteria is
+   derived by the report — do not store it. Run `teddy scores-check`: it
+   re-runs the evidence, enforces the bounds, and applies the
    baseline gate (strict for `"none"` scores and `ratchet` signals; the
    rubric's `tolerance` for `"llm"` scores). If it fails, the iteration is
    **not done**: improve the work or descope. Never lower a prior, never null

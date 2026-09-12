@@ -1,7 +1,4 @@
 {
-  "iteration": "0005-lint-gate",
-  "ticket": "0005",
-  "baseline": "0004-github-native-approval",
   "timestamp": "2026-09-11T23:05:12Z",
   "criteria": {
     "adr-traceability": {
@@ -30,7 +27,5 @@
       "gates": {},
       "signals": {}
     }
-  },
-  "overall": 1,
-  "deterministic_gate": "pass"
+  }
 }

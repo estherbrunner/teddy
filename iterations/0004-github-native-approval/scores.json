@@ -1,7 +1,4 @@
 {
-  "iteration": "0004-github-native-approval",
-  "ticket": "0004",
-  "baseline": "0003-loop-closure",
   "timestamp": "2026-09-11T20:48:39Z",
   "criteria": {
     "adr-traceability": {
@@ -30,7 +27,5 @@
       "gates": {},
       "signals": {}
     }
-  },
-  "overall": 1,
-  "deterministic_gate": "pass"
+  }
 }

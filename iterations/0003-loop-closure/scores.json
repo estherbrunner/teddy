@@ -1,7 +1,4 @@
 {
-  "iteration": "0003-loop-closure",
-  "ticket": "0003",
-  "baseline": "0002-cockpit-minimal-scope",
   "timestamp": "2026-09-11T19:52:33Z",
   "criteria": {
     "adr-traceability": {
@@ -30,7 +27,5 @@
       "gates": {},
       "signals": {}
     }
-  },
-  "overall": 1,
-  "deterministic_gate": "pass"
+  }
 }
