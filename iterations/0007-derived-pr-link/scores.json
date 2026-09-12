@@ -1,0 +1,25 @@
+{
+  "iteration": "0007-derived-pr-link",
+  "ticket": "0007",
+  "baseline": "0006-derived-state",
+  "timestamp": "2026-09-12T12:00:00Z",
+  "criteria": {
+    "adr-traceability": {
+      "score": 1,
+      "judge": "manifest-sync",
+      "rationale": "checks/manifest-sync.ts passes: 5 ADRs resolve, adr/0005 (amended) keeps its links to cockpit-report, scores-check, selftest; no orphans. 29-case selftest covers the derived PR number on a merged fixture (#10, unchanged by a later merge touching the directory), null while open, and rejection of the legacy ticket 'pr' field"
+    },
+    "cockpit-clarity": {
+      "score": 1,
+      "judge": "llm",
+      "rationale": "cockpit/main.ts bigrow link now resolves directly: 'merged in #N ↗' to the iteration's PR for closed iterations, and a branch-scoped PR search (head:iteration/<id>) for open ones — one fewer click than the /pulls queue it replaced; trend, ADR status, and judge-surface panels unchanged. Self-judged pending human review"
+    },
+    "loop-closure": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not exercised — the amendment followed a human design question, not a judge/human score disagreement"
+    }
+  },
+  "overall": 1,
+  "deterministic_gate": "pass"
+}

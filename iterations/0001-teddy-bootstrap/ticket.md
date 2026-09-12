@@ -4,7 +4,6 @@ type: feature
 goal: Bootstrap the Teddy harness — layout, ADR 0001, manifest, rubric, deterministic checks, and the five agent skills.
 constraint: score must not decrease (baseline: none — first iteration)
 adr_refs: [0001]
-pr: null
 ---
 
 ## Scope

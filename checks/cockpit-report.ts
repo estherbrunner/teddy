@@ -8,7 +8,7 @@
 // Usage:
 //   node checks/cockpit-report.ts [root]          regenerate cockpit/data.js
 //   node checks/cockpit-report.ts --check [root]  exit 1 if generation fails (writes nothing)
-import { isGitRepo, iterationStatus, parseRubric, readJson, readText, repositoryUrl, writeText } from "./lib.ts";
+import { isGitRepo, iterationStatus, mergedPr, parseRubric, readJson, readText, repositoryUrl, writeText } from "./lib.ts";
 
 const args = process.argv.slice(2);
 const checkOnly = args.includes("--check");
@@ -54,6 +54,8 @@ const iterationsOut = registry.iterations.map((entry) => {
     id: entry.id,
     baseline: entry.baseline,
     status: iterationStatus(root, entry.id),
+    // Derived from the merge commit subject (adr/0005, amended); null while open.
+    pr: mergedPr(root, `iterations/${entry.id}`),
     timestamp: scores.timestamp,
     overall: scores.overall,
     deterministic_gate: scores.deterministic_gate,

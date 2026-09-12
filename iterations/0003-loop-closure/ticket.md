@@ -4,7 +4,6 @@ type: decision
 goal: Close the loop on the baseline-gate comparability defect flagged during bootstrap review — resolve it into an adr/0001 amendment promoted to a deterministic assertion.
 constraint: each exercised criterion must not decrease against its last recorded score (baseline: iterations/0002-cockpit-minimal-scope/scores.json)
 adr_refs: [0001]
-pr: https://github.com/estherbrunner/teddy/pull/1
 ---
 
 ## Disagreement being closed

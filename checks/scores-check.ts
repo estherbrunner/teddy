@@ -134,7 +134,12 @@ for (const entry of registry.iterations) {
       }
     }
     if (!Array.isArray(fm.adr_refs)) fail(`${entry.ticket}: missing required field 'adr_refs'`);
-    if (!("pr" in fm)) fail(`${entry.ticket}: missing required field 'pr' (null until the PR opens)`);
+    if ("pr" in fm) {
+      fail(
+        `${entry.ticket}: legacy field 'pr' — removed by adr/0005 (amended); the PR is read ` +
+          `off the merge commit, never stored`,
+      );
+    }
   }
 
   // Criteria + aggregation.

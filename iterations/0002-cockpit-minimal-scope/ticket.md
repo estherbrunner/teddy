@@ -4,7 +4,6 @@ type: feature
 goal: Build cockpit v0 — the static vanilla-TS dashboard dogfooded as the second iteration.
 constraint: score must not decrease (baseline: iterations/0001-teddy-bootstrap/scores.json)
 adr_refs: [0002]
-pr: null
 ---
 
 ## Scope

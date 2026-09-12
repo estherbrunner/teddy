@@ -12,6 +12,7 @@ interface Iteration {
   id: string;
   baseline: string | null;
   status: string;
+  pr: number | null;
   timestamp: string;
   overall: number;
   deterministic_gate: string;
@@ -163,11 +164,18 @@ function render(): void {
     bigrow.appendChild(el("div", "delta flat", "first iteration — no baseline"));
   }
   bigrow.appendChild(el("span", `chip ${latest.deterministic_gate === "pass" ? "accepted" : "pending"}`, `deterministic gate: ${latest.deterministic_gate}`));
-  if (latest.status === "open" && data.repository) {
-    const review = document.createElement("a");
-    review.href = `${data.repository}/pulls`;
-    review.textContent = "review & merge ↗";
-    bigrow.appendChild(review);
+  // adr/0005 (amended): the PR is read off the merge commit, never stored —
+  // closed iterations link to it; open ones are found by their branch name.
+  if (data.repository) {
+    const link = document.createElement("a");
+    if (latest.pr !== null) {
+      link.href = `${data.repository}/pull/${latest.pr}`;
+      link.textContent = `merged in #${latest.pr} ↗`;
+    } else {
+      link.href = `${data.repository}/pulls?q=${encodeURIComponent(`is:pr head:iteration/${latest.id}`)}`;
+      link.textContent = "review & merge ↗";
+    }
+    bigrow.appendChild(link);
   }
   app.appendChild(bigrow);
 

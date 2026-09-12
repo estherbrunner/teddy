@@ -89,7 +89,7 @@ stay in history and are inert.
   iteration as `open`; after merge, `main` shows it `closed` — with no
   action by anyone. This is the behaviour adr/0003 intended.
 - `manifest-of-iterations.json` shrinks to `id`, `ticket`, `scores`,
-  `baseline`. (The stored `baseline` field is itself suspect under
+  `baseline`; the ticket loses `pr` (see amendment). (The stored `baseline` field is itself suspect under
   concurrent PRs — deriving it from `git merge-base` is a separate decision,
   out of scope here.)
 - `selftest` cases for stored closure and stale `data.js` are replaced by
@@ -123,3 +123,19 @@ the first ADR acceptance whose PR CI is green before the merge.
   extra steps; remove the cache.
 - **Cockpit fetches git state at runtime** — a `file://` page has no git
   and no server (adr/0002); build-time derivation keeps the renderer dumb.
+
+## Amendment — the PR link is derived too
+
+The ticket schema (adr/0001) carried `pr: null`, to be filled once the PR
+opened — which by construction needs a commit *after* the PR exists, on
+every iteration. It is the same stored copy of git-recorded fact this ADR
+removes: GitHub writes the PR number into the merge commit subject
+(`Merge pull request #N from …`), and `mergeTrace` already reads that
+subject.
+
+Amended: `pr` is removed from the ticket frontmatter and rejected as a
+legacy field by `scores-check`. `cockpit-report` derives `pr` per iteration
+from the merge commit (`lib.ts#mergedPr`; `null` while open). The cockpit
+links closed iterations to `/pull/N` and open ones to the PR search for
+their branch (`head:iteration/<id>`) — no field, no follow-up commit.
+Implemented by iteration 0007.
