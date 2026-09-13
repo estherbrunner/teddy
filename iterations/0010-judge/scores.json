@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-09-12T22:43:56Z",
+  "criteria": {
+    "adr-traceability": {
+      "score": 1,
+      "judge": "none",
+      "rationale": "deterministic: gate manifest-sync pass, gate selftest pass, gate typecheck pass, gate lint pass",
+      "gates": {
+        "manifest-sync": "pass",
+        "selftest": "pass",
+        "typecheck": "pass",
+        "lint": "pass"
+      },
+      "signals": {}
+    },
+    "cockpit-clarity": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not judged — no judge credential in this environment",
+      "gates": {},
+      "signals": {}
+    },
+    "loop-closure": {
+      "score": null,
+      "judge": "llm",
+      "rationale": "not judged — no judge credential in this environment",
+      "gates": {},
+      "signals": {}
+    }
+  }
+}

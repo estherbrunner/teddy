@@ -2,6 +2,7 @@
 // teddy <command> [--json|--check] [root]  (adr/0007)
 //   check                 manifest-sync + scores-check + report --check — the CI gate
 //   report                write <root>/cockpit/ (data.js + dashboard)
+//   judge                 score the open iteration on this branch (adr/0006; local, needs a credential for llm criteria)
 //   <check-id>            run a check: a host checks/<id>.ts or a built-in
 //                         (manifest-sync, scores-check, lint, typecheck, test, coverage)
 import { spawnSync } from "node:child_process";
@@ -21,14 +22,14 @@ function run(script: string, args: string[]): number {
 
 function usage(): never {
   const builtins = listBuiltinChecks().join(", ");
-  console.error(`usage: teddy <check | report | ${builtins}> [--json|--check] [root]`);
+  console.error(`usage: teddy <check | report | judge | ${builtins}> [--json|--check|--verify|--dry-run] [root]`);
   process.exit(2);
 }
 
 if (!command || command.startsWith("-")) usage();
 
-if (command === "report") {
-  process.exit(run(join(here, "commands", `report${BUILTIN_EXT}`), rest));
+if (command === "report" || command === "judge") {
+  process.exit(run(join(here, "commands", `${command}${BUILTIN_EXT}`), rest));
 }
 
 if (command === "check") {
